@@ -1,6 +1,6 @@
 # Relay
 
-**When Claude's rate limit hits, another agent picks up exactly where you left off.**
+**When Claude Code hits its rate limit, another agent picks up exactly where you left off — with full conversation context.**
 
 [![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)](https://www.rust-lang.org/)
 [![npm](https://img.shields.io/npm/v/@masyv/relay)](https://www.npmjs.com/package/@masyv/relay)
@@ -8,138 +8,179 @@
 
 ## The Problem
 
-You're building a feature. It's 6:20 PM. You need to submit by 7 PM. Claude hits its rate limit.
+It's 6:20 PM. Your submission is at 7 PM. You're deep in a Claude Code session — 45 minutes of context, decisions, half-finished code. Then:
 
-Your entire session context — what you were building, your todos, the last error you were debugging, the architectural decisions you made — all gone. You have to re-explain everything to a new tool. By the time you're set up, it's 6:45 PM.
+> **Rate limit reached. Please wait.**
 
-**Relay fixes this.** It captures your full session state and hands it to Codex, Gemini, Ollama, or GPT-4 — automatically, with complete context — so work never stops.
+Your entire session context is gone. You open Codex or Gemini and spend 20 minutes re-explaining everything. By the time you're set up, it's 6:50.
 
-## How It Works
+## The Solution
+
+```bash
+relay handoff --to codex
+```
+
+Relay reads your **actual Claude Code session** — the full conversation, every tool call, every file edit, every error — compresses it into a handoff package, and opens Codex (or Gemini, Aider, Ollama, etc.) with complete context. The new agent knows exactly what you were doing and waits for your instructions.
+
+## What Relay Captures
+
+This is NOT just git state. Relay reads Claude's actual `.jsonl` session transcript:
 
 ```
-Claude Code session running...
-   | (rate limit hit)
-   v
-Relay captures session state:
-  - Current task (from conversation)
-  - Todo list + status (from TodoWrite)
-  - Git branch, diff, recent commits
-  - Last error / last tool output
-  - Key decisions made
-  - Deadline (if set)
-   |
-   v
-Relay dispatches to fallback agent:
-  -> Codex CLI (if installed)
-  -> Gemini (if API key set)
-  -> Ollama (if running locally)
-  -> GPT-4 (if API key set)
-   |
-   v
-Agent picks up EXACTLY where you left off.
+  ════════════════════════════════════════════════════════
+  📋  Session Snapshot
+  ════════════════════════════════════════════════════════
+
+  📁  /Users/dev/myproject
+  🕐  2026-04-05 14:46
+
+  🎯 Current Task
+  ──────────────────────────────────────────────────
+  Fix the mobile/desktop page separation in the footer
+
+  📝 Progress
+  ──────────────────────────────────────────────────
+  ✅  Database schema + REST API
+  ✅  Landing page overhaul
+  🔄  Footer link separation (IN PROGRESS)
+  ⏳  Auth system
+
+  🚨 Last Error
+  ──────────────────────────────────────────────────
+  Error: Next.js couldn't find the package from project directory
+
+  💡 Key Decisions
+  ──────────────────────────────────────────────────
+  • Using Socket.io instead of raw WebSockets
+  • Clean reinstall fixed the @next/swc-darwin-arm64 issue
+
+  💬 Conversation (25 turns)
+  ──────────────────────────────────────────────────
+  🤖 AI   Now update the landing page footer too.
+  🔧 TOOL [Edit] pages/index.tsx (replacing 488 chars)
+  📤 OUT  File updated successfully.
+  🤖 AI   Add /mobile to the Layout bypass list.
+  🔧 TOOL [Edit] components/Layout.tsx (replacing 99 chars)
+  🔧 TOOL [Bash] npx next build
+  📤 OUT  ✓ Build passed — 12 pages compiled
 ```
+
+The fallback agent sees **everything**: what Claude was thinking, what files it edited, what errors it hit, and where it stopped.
+
+## 8 Supported Agents
+
+```
+  ════════════════════════════════════════════════════════
+  🤖  Available Agents
+  ════════════════════════════════════════════════════════
+
+  Priority: codex → claude → aider → gemini → copilot → opencode → ollama → openai
+
+  ✅  codex        Found at /opt/homebrew/bin/codex
+  ✅  copilot      Found at /opt/homebrew/bin/copilot
+  ❌  claude       Install: npm install -g @anthropic-ai/claude-code
+  ❌  aider        Install: pip install aider-chat
+  ❌  gemini       Set GEMINI_API_KEY env var
+  ❌  opencode     Install: go install github.com/opencode-ai/opencode@latest
+  ❌  ollama       Not reachable at http://localhost:11434
+  ❌  openai       Set OPENAI_API_KEY env var
+
+  🚀 2 agents ready for handoff
+```
+
+| Agent | Type | How it launches |
+|-------|------|-----------------|
+| **Codex** | CLI (OpenAI) | Opens interactive TUI with context |
+| **Claude** | CLI (Anthropic) | New Claude session with context |
+| **Aider** | CLI (open source) | Opens with --message handoff |
+| **Gemini** | API / CLI | Gemini CLI or REST API |
+| **Copilot** | CLI (GitHub) | Opens with context |
+| **OpenCode** | CLI (Go) | Opens with context |
+| **Ollama** | Local API | REST call to local model |
+| **OpenAI** | API | GPT-4o / GPT-5.4 API call |
 
 ## Quick Start
 
 ```bash
 # Install
 git clone https://github.com/Manavarya09/relay
-cd relay && ./scripts/build.sh && ./scripts/install.sh
+cd relay && ./scripts/build.sh
+
+# Symlink to PATH (avoids macOS quarantine)
+ln -sf $(pwd)/core/target/release/relay ~/.cargo/bin/relay
 
 # Generate config
 relay init
 
-# Check available agents
+# Check what agents you have
 relay agents
 
-# See what would be handed off
+# See your current session snapshot
 relay status
 
-# Manual handoff (now)
+# Hand off to Codex (interactive — opens TUI)
+relay handoff --to codex
+
+# Interactive agent picker
 relay handoff
 
-# Handoff to specific agent with deadline
+# With deadline urgency
 relay handoff --to codex --deadline "7:00 PM"
+```
 
-# Dry run — just print the handoff package
+## Context Control
+
+```bash
+# Default: last 25 conversation turns + everything
+relay handoff --to codex
+
+# Light: 10 turns only
+relay handoff --to codex --turns 10
+
+# Only git state + todos (no conversation)
+relay handoff --to codex --include git,todos
+
+# Only conversation
+relay handoff --to codex --include conversation
+
+# Dry run — see what gets sent without launching
 relay handoff --dry-run
 ```
 
-## What Relay Captures
+## How It Works
 
-```
-═══ Relay Session Snapshot ═══
+1. **Reads** `~/.claude/projects/<project>/<session>.jsonl` — Claude's actual transcript
+2. **Extracts** user messages, assistant responses, tool calls (Bash, Read, Write, Edit), tool results, errors
+3. **Reads** TodoWrite state from the JSONL (your live todo list)
+4. **Captures** git branch, diff summary, uncommitted files, recent commits
+5. **Compresses** into a handoff prompt optimized for the target agent
+6. **Launches** the agent interactively with inherited stdin/stdout
 
-Project: /Users/dev/myproject
-Captured: 2026-04-05 13:32:02
+## Config
 
-── Current Task ──
-  Building WebSocket handler in src/server/ws.rs
-
-── Todos ──
-  ✅ [completed] Database schema + REST API
-  🔄 [in_progress] WebSocket handler (60% done)
-  ⏳ [pending] Frontend charts
-  ⏳ [pending] Auth
-
-── Last Error ──
-  error[E0499]: cannot borrow `state` as mutable...
-
-── Decisions ──
-  • Using Socket.io instead of raw WebSockets
-  • Redis pub/sub for cross-server events
-
-── Git ──
-  Branch: feature/websocket
-  3 uncommitted changes
-  Recent: abc1234 Add WebSocket route skeleton
-```
-
-## Agent Priority
-
-Configure in `~/.relay/config.toml`:
+`~/.relay/config.toml`:
 
 ```toml
 [general]
-priority = ["codex", "gemini", "ollama", "openai"]
-auto_handoff = true
+priority = ["codex", "claude", "aider", "gemini", "copilot", "opencode", "ollama", "openai"]
 max_context_tokens = 8000
+auto_handoff = true
 
 [agents.codex]
-model = "o4-mini"
+model = "gpt-5.4"
 
 [agents.gemini]
 api_key = "your-key"
-model = "gemini-2.5-pro"
+
+[agents.openai]
+api_key = "your-key"
 
 [agents.ollama]
 url = "http://localhost:11434"
 model = "llama3"
-
-[agents.openai]
-api_key = "your-key"
-model = "gpt-4o"
 ```
 
-Relay tries agents in priority order and uses the first available one.
-
-## CLI
-
-```
-COMMANDS:
-  handoff   Hand off to fallback agent (--to, --deadline, --dry-run)
-  status    Show current session snapshot
-  agents    List agents and availability
-  init      Generate default config
-  hook      PostToolUse hook (auto-detect rate limits)
-
-OPTIONS:
-  --json       Output as JSON
-  --project    Project directory (default: cwd)
-  -v           Verbose logging
-```
-
-## Auto-Handoff via Hook
+## Auto-Handoff (PostToolUse Hook)
 
 Add to `~/.claude/settings.json`:
 
@@ -147,23 +188,25 @@ Add to `~/.claude/settings.json`:
 {
   "hooks": {
     "PostToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [{ "type": "command", "command": "relay hook" }]
-      }
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "relay hook" }] }
     ]
   }
 }
 ```
 
-Relay will detect rate limit signals in tool output and automatically hand off.
+Relay detects rate limit signals in tool output and automatically hands off.
 
 ## Performance
 
-- **4.6 MB** binary (release, stripped)
-- **< 100ms** to capture full session snapshot
-- **Zero network calls** for capture (git + file reads only)
+- **4.6 MB** binary
+- **< 100ms** session capture
+- **Zero network calls** for capture
+- **Rust** — no runtime, no GC
 
 ## License
 
 MIT
+
+---
+
+Built by [@masyv](https://github.com/Manavarya09)
