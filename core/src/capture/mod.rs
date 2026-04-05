@@ -26,6 +26,15 @@ pub fn capture_snapshot(
 
     let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
+    // Convert conversation turns
+    let conversation: Vec<crate::ConversationTurn> = session_info.conversation
+        .into_iter()
+        .map(|t| crate::ConversationTurn {
+            role: t.role,
+            content: t.content,
+        })
+        .collect();
+
     Ok(SessionSnapshot {
         current_task: session_info.current_task,
         todos,
@@ -37,5 +46,6 @@ pub fn capture_snapshot(
         recent_files,
         timestamp,
         deadline: deadline.map(String::from),
+        conversation,
     })
 }

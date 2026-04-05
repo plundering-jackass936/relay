@@ -206,6 +206,28 @@ fn main() -> Result<()> {
                 }
                 println!();
             }
+
+            if !snapshot.conversation.is_empty() {
+                println!("{}", format!("── Conversation ({} turns) ──", snapshot.conversation.len()).cyan());
+                // Show last 15 turns
+                let start = snapshot.conversation.len().saturating_sub(15);
+                for turn in &snapshot.conversation[start..] {
+                    let prefix = match turn.role.as_str() {
+                        "user"           => "👤 USER".to_string(),
+                        "assistant"      => "🤖 CLAUDE".to_string(),
+                        "assistant_tool" => "🔧 TOOL".to_string(),
+                        "tool_result"    => "📤 RESULT".to_string(),
+                        _                => turn.role.clone(),
+                    };
+                    let content = if turn.content.len() > 120 {
+                        format!("{}...", &turn.content[..117])
+                    } else {
+                        turn.content.clone()
+                    };
+                    println!("  {}: {}", prefix, content);
+                }
+                println!();
+            }
         }
 
         Commands::Agents => {

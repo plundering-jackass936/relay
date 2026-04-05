@@ -162,6 +162,15 @@ pub struct SessionSnapshot {
     pub timestamp: String,
     /// Deadline if set
     pub deadline: Option<String>,
+    /// FULL conversation context from Claude session transcript
+    pub conversation: Vec<ConversationTurn>,
+}
+
+/// A single turn in the conversation (user message, assistant text, or tool call/result).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConversationTurn {
+    pub role: String,
+    pub content: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

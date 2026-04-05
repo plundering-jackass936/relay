@@ -100,6 +100,22 @@ pub fn build_handoff(
         sections.push(files);
     }
 
+    // ── Full Conversation Context ──────────────────────────────
+    if !snapshot.conversation.is_empty() {
+        let mut convo = String::from("## CONVERSATION CONTEXT\n\nBelow is the full conversation from the Claude session (most recent turns).\nThis is the actual context that was in Claude's window when it was interrupted.\n\n");
+        for turn in &snapshot.conversation {
+            let prefix = match turn.role.as_str() {
+                "user"           => "USER",
+                "assistant"      => "CLAUDE",
+                "assistant_tool" => "CLAUDE_TOOL",
+                "tool_result"    => "TOOL_OUTPUT",
+                _                => &turn.role,
+            };
+            convo.push_str(&format!("[{prefix}] {}\n\n", turn.content));
+        }
+        sections.push(convo);
+    }
+
     // ── Instructions for agent ─────────────────────────────────
     let instructions = format!(
         "## INSTRUCTIONS\n\n\
