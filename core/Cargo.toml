@@ -42,8 +42,11 @@ blake3 = "1"
 # HTTP client (for Ollama, OpenAI, Gemini APIs)
 ureq = { version = "2", features = ["json"] }
 
-# Terminal
+# Terminal UI
 colored = "2"
+indicatif = "0.17"
+dialoguer = { version = "0.11", features = ["fuzzy-select"] }
+console = "0.15"
 
 [profile.release]
 opt-level = 3

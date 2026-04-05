@@ -2,6 +2,7 @@ pub mod agents;
 pub mod capture;
 pub mod detect;
 pub mod handoff;
+pub mod tui;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

@@ -1,22 +1,20 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use colored::Colorize;
 use std::path::PathBuf;
 
-use relay::{agents, capture, handoff, Config};
+use relay::{agents, capture, handoff, tui, Config};
 
 #[derive(Parser)]
 #[command(
     name = "relay",
     about = "Relay — When Claude's rate limit hits, another agent picks up where you left off.",
-    long_about = "Captures your Claude Code session state (task, todos, git diff, decisions,\nerrors) and hands it off to Codex, Gemini, Ollama, or GPT-4 — so your\nwork never stops.",
     version
 )]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
 
-    /// Output as JSON
+    /// Output as JSON (no TUI)
     #[arg(long, global = true)]
     json: bool,
 
@@ -31,17 +29,17 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Hand off current session to a fallback agent right now
+    /// Hand off current session to a fallback agent
     Handoff {
-        /// Force a specific agent (codex, gemini, ollama, openai)
+        /// Target agent (codex, claude, aider, gemini, copilot, opencode, ollama, openai)
         #[arg(long)]
         to: Option<String>,
 
-        /// Set deadline urgency (e.g. "7pm", "19:00", "30min")
+        /// Set deadline urgency (e.g. "7pm", "30min")
         #[arg(long)]
         deadline: Option<String>,
 
-        /// Don't execute — just print the handoff package
+        /// Just print the handoff — don't launch agent
         #[arg(long)]
         dry_run: bool,
 
@@ -54,18 +52,17 @@ enum Commands {
         include: String,
     },
 
-    /// Show current session snapshot (what would be handed off)
+    /// Show current session snapshot
     Status,
 
-    /// List configured agents and their availability
+    /// List configured agents and availability
     Agents,
 
-    /// Generate default config file at ~/.relay/config.toml
+    /// Generate default config at ~/.relay/config.toml
     Init,
 
-    /// PostToolUse hook mode (auto-detect rate limits from stdin)
+    /// PostToolUse hook (auto-detect rate limits)
     Hook {
-        /// Session ID
         #[arg(long, default_value = "unknown")]
         session: String,
     },
@@ -92,286 +89,183 @@ fn main() -> Result<()> {
     });
 
     match cli.command {
+        // ═══════════════════════════════════════════════════════════════
+        // HANDOFF
+        // ═══════════════════════════════════════════════════════════════
         Commands::Handoff { to, deadline, dry_run, turns, include } => {
-            eprintln!("{}", "⚡ Relay — capturing session state...".yellow().bold());
+            if !cli.json {
+                tui::print_banner();
+            }
 
-            // Set conversation turn limit before capture
+            // Step 1: Capture
+            let sp = if !cli.json { Some(tui::step(1, 3, "Capturing session state...")) } else { None };
+
             relay::capture::session::MAX_CONVERSATION_TURNS
                 .store(turns, std::sync::atomic::Ordering::Relaxed);
 
-            let mut snapshot = capture::capture_snapshot(
-                &project_dir,
-                deadline.as_deref(),
-            )?;
+            let mut snapshot = capture::capture_snapshot(&project_dir, deadline.as_deref())?;
 
-            // Filter sections based on --include flag
+            // Apply include filter
             let includes: Vec<&str> = include.split(',').map(|s| s.trim()).collect();
             if !includes.contains(&"all") {
-                if !includes.contains(&"conversation") {
-                    snapshot.conversation.clear();
-                }
-                if !includes.contains(&"git") {
-                    snapshot.git_state = None;
-                    snapshot.recent_files.clear();
-                }
-                if !includes.contains(&"todos") {
-                    snapshot.todos.clear();
-                }
+                if !includes.contains(&"conversation") { snapshot.conversation.clear(); }
+                if !includes.contains(&"git") { snapshot.git_state = None; snapshot.recent_files.clear(); }
+                if !includes.contains(&"todos") { snapshot.todos.clear(); }
             }
 
-            let target = to.as_deref().unwrap_or("auto");
-            let handoff_text = handoff::build_handoff(
-                &snapshot,
-                target,
-                config.general.max_context_tokens,
-            )?;
+            if let Some(sp) = sp { sp.finish_with_message("Session captured"); }
 
-            // Save handoff file for reference
+            // Step 2: Build handoff
+            let sp = if !cli.json { Some(tui::step(2, 3, "Building handoff package...")) } else { None };
+
+            // Resolve target agent
+            let target_name = if let Some(ref name) = to {
+                name.clone()
+            } else if !cli.json && !dry_run {
+                // Interactive agent selection
+                if let Some(sp) = sp.as_ref() { sp.finish_with_message("Handoff built"); }
+
+                let statuses = agents::check_all_agents(&config);
+                let agent_list: Vec<(String, bool, String)> = statuses
+                    .iter()
+                    .map(|s| (s.name.clone(), s.available, s.reason.clone()))
+                    .collect();
+
+                match tui::select_agent(&agent_list) {
+                    Some(name) => name,
+                    None => {
+                        eprintln!("  No agent selected.");
+                        return Ok(());
+                    }
+                }
+            } else {
+                "auto".into()
+            };
+
+            let handoff_text = handoff::build_handoff(
+                &snapshot, &target_name, config.general.max_context_tokens,
+            )?;
             let handoff_path = handoff::save_handoff(&handoff_text, &project_dir)?;
 
-            if dry_run || cli.json {
-                if cli.json {
-                    let result = serde_json::json!({
-                        "snapshot": snapshot,
-                        "handoff_text": handoff_text,
-                        "handoff_file": handoff_path.to_string_lossy(),
-                        "target_agent": target,
-                    });
-                    println!("{}", serde_json::to_string_pretty(&result)?);
-                } else {
-                    println!("{handoff_text}");
-                    eprintln!();
-                    eprintln!("{}", format!("📄 Saved to: {}", handoff_path.display()).dimmed());
-                }
+            if let Some(sp) = sp { sp.finish_with_message("Handoff built"); }
+
+            // JSON / dry-run output
+            if cli.json {
+                println!("{}", serde_json::to_string_pretty(&serde_json::json!({
+                    "snapshot": snapshot,
+                    "handoff_text": handoff_text,
+                    "handoff_file": handoff_path.to_string_lossy(),
+                    "target_agent": target_name,
+                }))?);
+                return Ok(());
+            }
+            if dry_run {
+                println!("{handoff_text}");
+                eprintln!();
+                eprintln!("  📄 Saved: {}", handoff_path.display());
                 return Ok(());
             }
 
-            eprintln!("{}", format!("📄 Handoff saved: {}", handoff_path.display()).dimmed());
-            eprintln!();
+            // Step 3: Launch agent
+            let sp = tui::step(3, 3, &format!("Launching {}...", target_name));
 
-            // Execute handoff
-            let result = if let Some(ref agent_name) = to {
-                agents::handoff_to_named(&config, agent_name, &handoff_text, &project_dir.to_string_lossy())
+            let result = if to.is_some() {
+                agents::handoff_to_named(&config, &target_name, &handoff_text, &project_dir.to_string_lossy())
             } else {
                 agents::handoff_to_first_available(&config, &handoff_text, &project_dir.to_string_lossy())
             }?;
 
-            if result.success {
-                eprintln!("{}", format!("✅ Handed off to {}", result.agent).green().bold());
-                eprintln!("   {}", result.message);
+            sp.finish_with_message(if result.success {
+                format!("{} launched", target_name)
             } else {
-                eprintln!("{}", format!("❌ Handoff failed: {}", result.message).red());
-                eprintln!();
-                eprintln!("💡 The handoff context was saved to:");
-                eprintln!("   {}", handoff_path.display());
-                eprintln!("   You can copy-paste it into any AI assistant manually.");
+                "Failed".into()
+            });
+
+            if result.success {
+                tui::print_handoff_success(&result.agent, &handoff_path.to_string_lossy());
+            } else {
+                tui::print_handoff_fail(&result.message, &handoff_path.to_string_lossy());
             }
         }
 
+        // ═══════════════════════════════════════════════════════════════
+        // STATUS
+        // ═══════════════════════════════════════════════════════════════
         Commands::Status => {
+            let sp = if !cli.json { Some(tui::spinner("Reading session state...")) } else { None };
             let snapshot = capture::capture_snapshot(&project_dir, None)?;
+            if let Some(sp) = sp { sp.finish_and_clear(); }
 
             if cli.json {
                 println!("{}", serde_json::to_string_pretty(&snapshot)?);
-                return Ok(());
-            }
-
-            println!("{}", "═══ Relay Session Snapshot ═══".bold());
-            println!();
-            println!("{}: {}", "Project".bold(), snapshot.project_dir);
-            println!("{}: {}", "Captured".bold(), snapshot.timestamp);
-            println!();
-
-            println!("{}", "── Current Task ──".cyan());
-            println!("  {}", snapshot.current_task);
-            println!();
-
-            if !snapshot.todos.is_empty() {
-                println!("{}", "── Todos ──".cyan());
-                for t in &snapshot.todos {
-                    let icon = match t.status.as_str() {
-                        "completed"   => "✅",
-                        "in_progress" => "🔄",
-                        _             => "⏳",
-                    };
-                    println!("  {icon} [{}] {}", t.status, t.content);
-                }
-                println!();
-            }
-
-            if let Some(ref err) = snapshot.last_error {
-                println!("{}", "── Last Error ──".red());
-                println!("  {err}");
-                println!();
-            }
-
-            if !snapshot.decisions.is_empty() {
-                println!("{}", "── Decisions ──".cyan());
-                for d in &snapshot.decisions {
-                    println!("  • {d}");
-                }
-                println!();
-            }
-
-            if let Some(ref git) = snapshot.git_state {
-                println!("{}", "── Git ──".cyan());
-                println!("  Branch: {}", git.branch);
-                println!("  {}", git.status_summary);
-                if !git.recent_commits.is_empty() {
-                    println!("  Recent:");
-                    for c in git.recent_commits.iter().take(3) {
-                        println!("    {c}");
-                    }
-                }
-                println!();
-            }
-
-            if !snapshot.recent_files.is_empty() {
-                println!("{}", "── Changed Files ──".cyan());
-                for f in snapshot.recent_files.iter().take(10) {
-                    println!("  {f}");
-                }
-                println!();
-            }
-
-            if !snapshot.conversation.is_empty() {
-                println!("{}", format!("── Conversation ({} turns) ──", snapshot.conversation.len()).cyan());
-                // Show last 15 turns
-                let start = snapshot.conversation.len().saturating_sub(15);
-                for turn in &snapshot.conversation[start..] {
-                    let prefix = match turn.role.as_str() {
-                        "user"           => "👤 USER".to_string(),
-                        "assistant"      => "🤖 CLAUDE".to_string(),
-                        "assistant_tool" => "🔧 TOOL".to_string(),
-                        "tool_result"    => "📤 RESULT".to_string(),
-                        _                => turn.role.clone(),
-                    };
-                    let content = if turn.content.len() > 120 {
-                        format!("{}...", &turn.content[..117])
-                    } else {
-                        turn.content.clone()
-                    };
-                    println!("  {}: {}", prefix, content);
-                }
-                println!();
+            } else {
+                tui::print_snapshot(&snapshot);
             }
         }
 
+        // ═══════════════════════════════════════════════════════════════
+        // AGENTS
+        // ═══════════════════════════════════════════════════════════════
         Commands::Agents => {
+            let sp = if !cli.json { Some(tui::spinner("Checking agents...")) } else { None };
             let statuses = agents::check_all_agents(&config);
+            if let Some(sp) = sp { sp.finish_and_clear(); }
 
             if cli.json {
                 println!("{}", serde_json::to_string_pretty(&statuses)?);
-                return Ok(());
-            }
-
-            println!("{}", "═══ Relay Agents ═══".bold());
-            println!();
-            println!("Priority order: {}", config.general.priority.join(" → "));
-            println!();
-
-            for s in &statuses {
-                let icon = if s.available { "✅" } else { "❌" };
-                let name = if s.available {
-                    s.name.green().bold().to_string()
-                } else {
-                    s.name.dimmed().to_string()
-                };
-                println!(
-                    "  {icon}  {:<10}  {}",
-                    name,
-                    s.reason
-                );
-                if let Some(ref v) = s.version {
-                    println!("              Version: {v}");
-                }
-            }
-            println!();
-
-            let available = statuses.iter().filter(|s| s.available).count();
-            if available == 0 {
-                eprintln!("{}", "⚠️  No agents available. Run 'relay init' to configure.".yellow());
             } else {
-                println!(
-                    "  {} agent{} ready for handoff.",
-                    available,
-                    if available == 1 { "" } else { "s" }
-                );
+                tui::print_agents(&config.general.priority, &statuses);
             }
         }
 
+        // ═══════════════════════════════════════════════════════════════
+        // INIT
+        // ═══════════════════════════════════════════════════════════════
         Commands::Init => {
             let path = relay::config_path();
             if path.exists() {
-                println!("Config already exists at: {}", path.display());
-                println!("Edit it to add API keys and customize agent priority.");
+                eprintln!("  Config exists: {}", path.display());
+                eprintln!("  Edit to add API keys and customize priority.");
             } else {
                 Config::save_default(&path)?;
-                println!("{}", "✅ Config created at:".green());
-                println!("   {}", path.display());
-                println!();
-                println!("Edit it to add API keys:");
-                println!("  [agents.gemini]");
-                println!("  api_key = \"your-gemini-key\"");
-                println!();
-                println!("  [agents.openai]");
-                println!("  api_key = \"your-openai-key\"");
+                eprintln!("  ✅ Config created: {}", path.display());
+                eprintln!();
+                eprintln!("  Add API keys:");
+                eprintln!("    [agents.gemini]");
+                eprintln!("    api_key = \"your-key\"");
+                eprintln!();
+                eprintln!("    [agents.openai]");
+                eprintln!("    api_key = \"your-key\"");
             }
         }
 
+        // ═══════════════════════════════════════════════════════════════
+        // HOOK
+        // ═══════════════════════════════════════════════════════════════
         Commands::Hook { session: _ } => {
             use std::io::Read;
             let mut raw = String::new();
             std::io::stdin().read_to_string(&mut raw)?;
 
-            // Check for rate limit signals
             if let Some(detection) = relay::detect::check_hook_output(&raw) {
                 eprintln!(
-                    "{}",
-                    format!(
-                        "🚨 [relay] Rate limit detected in {} output (signal: {})",
-                        detection.tool_name, detection.signal
-                    ).red().bold()
+                    "  🚨 Rate limit detected in {} (signal: {})",
+                    detection.tool_name, detection.signal
                 );
-
                 if config.general.auto_handoff {
-                    // Auto-handoff
                     let snapshot = capture::capture_snapshot(&project_dir, None)?;
-                    let handoff_text = handoff::build_handoff(
-                        &snapshot,
-                        "auto",
-                        config.general.max_context_tokens,
-                    )?;
-
+                    let handoff_text = handoff::build_handoff(&snapshot, "auto", config.general.max_context_tokens)?;
                     let handoff_path = handoff::save_handoff(&handoff_text, &project_dir)?;
-                    eprintln!(
-                        "📄 Handoff saved: {}",
-                        handoff_path.display()
-                    );
-
                     let result = agents::handoff_to_first_available(
-                        &config,
-                        &handoff_text,
-                        &project_dir.to_string_lossy(),
+                        &config, &handoff_text, &project_dir.to_string_lossy(),
                     )?;
-
                     if result.success {
-                        eprintln!(
-                            "{}",
-                            format!("✅ Auto-handed off to {}", result.agent).green()
-                        );
+                        eprintln!("  ✅ Auto-handed off to {}", result.agent);
                     } else {
-                        eprintln!(
-                            "{}",
-                            format!("⚠️  No agents available. Handoff saved to: {}",
-                                handoff_path.display()
-                            ).yellow()
-                        );
+                        eprintln!("  📄 Saved: {}", handoff_path.display());
                     }
                 }
             }
-
-            // Always pass through the original output
             print!("{raw}");
         }
     }
