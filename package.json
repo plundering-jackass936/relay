@@ -1,0 +1,38 @@
+{
+  "name": "@masyv/relay",
+  "version": "0.1.0",
+  "description": "Relay — When Claude's rate limit hits, another agent picks up exactly where you left off. Captures session state and hands off to Codex, Gemini, Ollama, or GPT-4.",
+  "scripts": {
+    "build": "./scripts/build.sh",
+    "install-bin": "./scripts/install.sh"
+  },
+  "keywords": [
+    "claude-code",
+    "claude",
+    "rate-limit",
+    "handoff",
+    "codex",
+    "gemini",
+    "ollama",
+    "openai",
+    "agent",
+    "fallback",
+    "context",
+    "continuity"
+  ],
+  "author": "masyv",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Manavarya09/relay"
+  },
+  "homepage": "https://github.com/Manavarya09/relay#readme",
+  "files": [
+    "README.md",
+    "LICENSE",
+    "hooks/",
+    "scripts/",
+    "core/src/",
+    "core/Cargo.toml"
+  ]
+}
