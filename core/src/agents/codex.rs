@@ -65,26 +65,38 @@ impl Agent for CodexAgent {
     fn execute(&self, handoff_prompt: &str, project_dir: &str) -> Result<HandoffResult> {
         let binary = self.find_binary().unwrap_or(self.binary.clone());
 
-        // Write handoff to a temp file
+        // Write handoff to a temp file for reference
         let tmp = std::env::temp_dir().join("relay_handoff.md");
         std::fs::write(&tmp, handoff_prompt)?;
 
-        // Launch codex with the prompt
-        let mut child = Command::new(&binary)
+        // Use `codex exec --full-auto` for non-interactive auto-approval
+        let output = Command::new(&binary)
             .current_dir(project_dir)
-            .arg("--model")
+            .arg("exec")
+            .arg("--full-auto")
+            .arg("-m")
             .arg(&self.model)
-            .arg("--quiet")
             .arg(handoff_prompt)
-            .spawn()?;
+            .output()?;
 
-        // Don't wait — let it run in the foreground
-        let _ = child.wait();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        if !stdout.is_empty() {
+            println!("{stdout}");
+        }
+        if !stderr.is_empty() {
+            eprintln!("{stderr}");
+        }
 
         Ok(HandoffResult {
             agent: "codex".into(),
-            success: true,
-            message: format!("Codex ({}) launched with handoff context", self.model),
+            success: output.status.success(),
+            message: if output.status.success() {
+                format!("Codex ({}) completed handoff task", self.model)
+            } else {
+                format!("Codex exited with code {:?}", output.status.code())
+            },
             handoff_file: Some(tmp.to_string_lossy().to_string()),
         })
     }
