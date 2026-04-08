@@ -10,7 +10,8 @@ use relay::{agents, capture, handoff, tui, Config};
 #[command(
     name = "relay",
     about = "Relay — When Claude's rate limit hits, another agent picks up where you left off.",
-    version
+    version = build_version_string(),
+    long_version = build_long_version_string(),
 )]
 struct Cli {
     #[command(subcommand)]
@@ -96,6 +97,20 @@ enum Commands {
         #[arg(long, default_value = "unknown")]
         session: String,
     },
+}
+
+fn build_version_string() -> &'static str {
+    concat!(env!("CARGO_PKG_VERSION"), " (", env!("RELAY_GIT_HASH"), ")")
+}
+
+fn build_long_version_string() -> &'static str {
+    concat!(
+        env!("CARGO_PKG_VERSION"),
+        "\n  commit:  ", env!("RELAY_GIT_HASH"),
+        "\n  built:   ", env!("RELAY_BUILD_DATE"),
+        "\n  rustc:   ", env!("RELAY_RUST_VERSION"),
+        "\n  target:  ", env!("RELAY_TARGET"),
+    )
 }
 
 fn main() -> Result<()> {
