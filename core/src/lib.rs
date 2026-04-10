@@ -1,15 +1,21 @@
 pub mod agents;
+pub mod analytics;
 pub mod capture;
 pub mod clean;
+pub mod cost;
 pub mod detect;
 pub mod diff;
 pub mod handoff;
 pub mod history;
+pub mod plugins;
+pub mod replay;
 pub mod resume;
 pub mod retry;
+pub mod scoring;
 pub mod secrets;
 pub mod tui;
 pub mod validate;
+pub mod watch;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

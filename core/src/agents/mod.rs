@@ -47,6 +47,9 @@ pub fn get_agents(config: &Config) -> Vec<Box<dyn Agent>> {
             _ => {} // unknown agent, skip
         }
     }
+    // Also load plugin agents
+    agents.extend(crate::plugins::discover_plugins());
+
     agents
 }
 
