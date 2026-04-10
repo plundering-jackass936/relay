@@ -6,38 +6,16 @@
 [![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)](https://www.rust-lang.org/)
 [![npm](https://img.shields.io/npm/v/@masyv/relay)](https://www.npmjs.com/package/@masyv/relay)
 [![GitHub Release](https://img.shields.io/github/v/release/Manavarya09/relay)](https://github.com/Manavarya09/relay/releases)
-[![Tests](https://img.shields.io/badge/tests-48_passing-brightgreen.svg)](https://github.com/Manavarya09/relay/actions)
+[![Tests](https://img.shields.io/badge/tests-62_passing-brightgreen.svg)](https://github.com/Manavarya09/relay/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-
-## Features
-
-- **Full conversation capture** — Reads Claude's actual `.jsonl` transcript, not just git
-- **8 agent adapters** — Codex, Claude, Aider, Gemini, Copilot, OpenCode, Ollama, OpenAI
-- **Interactive TUI** — Spinners, progress steps, fuzzy agent picker, color-coded output
-- **Smart context compression** — Priority-based truncation keeps critical info, drops low-value context
-- **Secret detection** — Scans handoff for API keys, tokens, passwords before sending
-- **Retry with backoff** — API agents retry transient failures (429, 5xx) automatically
-- **Shell completions** — `relay completions bash|zsh|fish|powershell`
-- **Config validation** — `relay validate` tests all agents before you need them
-- **Handoff cleanup** — `relay clean --keep 5` purges old handoff files
-- **Duration tracking** — Each handoff step shows elapsed time in milliseconds
-- **`relay resume`** — When Claude comes back, see what the fallback agent did
-- **`relay history`** — Browse past handoffs with `--format json|csv|table`
-- **`relay diff`** — Show exactly what changed during the handoff
-- **Clipboard mode** — `--clipboard` copies handoff for pasting into any tool
-- **Handoff templates** — `--template minimal|full|raw` for different formats
-- **Rate limit auto-detection** — PostToolUse hook triggers handoff automatically
-- **Context control** — `--turns 10 --include git,todos` to customize
-- **Zero network capture** — Pure local file parsing, < 100ms
-- **5 MB binary** — Rust, no runtime, no GC
 
 ## The Problem
 
-It's 6:20 PM. Your submission is at 7 PM. You're deep in a Claude Code session — 45 minutes of context, decisions, half-finished code. Then:
+You're deep in a Claude Code session — 45 minutes of context, decisions, half-finished code. Then:
 
 > **Rate limit reached. Please wait.**
 
-Your entire session context is gone. You open Codex or Gemini and spend 20 minutes re-explaining everything. By the time you're set up, it's 6:50.
+Your entire session context is gone. You open Codex or Gemini and spend 20 minutes re-explaining everything.
 
 ## The Solution
 
@@ -45,63 +23,42 @@ Your entire session context is gone. You open Codex or Gemini and spend 20 minut
 relay handoff --to codex
 ```
 
-Relay reads your **actual Claude Code session** — the full conversation, every tool call, every file edit, every error — compresses it into a handoff package, and opens Codex (or Gemini, Aider, Ollama, etc.) with complete context. The new agent knows exactly what you were doing and waits for your instructions.
+Relay reads your **actual Claude Code session transcript** — every conversation turn, tool call, file edit, error — compresses it with smart priority scoring, scans for leaked secrets, estimates the API cost, and launches the fallback agent with complete context. If that agent fails, it automatically chains to the next one.
 
-## What Relay Captures
+Or just run the daemon:
 
-This is NOT just git state. Relay reads Claude's actual `.jsonl` session transcript:
-
-```
-  ════════════════════════════════════════════════════════
-  📋  Session Snapshot
-  ════════════════════════════════════════════════════════
-
-  📁  /Users/dev/myproject
-  🕐  2026-04-05 14:46
-
-  🎯 Current Task
-  ──────────────────────────────────────────────────
-  Fix the mobile/desktop page separation in the footer
-
-  📝 Progress
-  ──────────────────────────────────────────────────
-  ✅  Database schema + REST API
-  ✅  Landing page overhaul
-  🔄  Footer link separation (IN PROGRESS)
-  ⏳  Auth system
-
-  🚨 Last Error
-  ──────────────────────────────────────────────────
-  Error: Next.js couldn't find the package from project directory
-
-  💡 Key Decisions
-  ──────────────────────────────────────────────────
-  • Using Socket.io instead of raw WebSockets
-  • Clean reinstall fixed the @next/swc-darwin-arm64 issue
-
-  💬 Conversation (25 turns)
-  ──────────────────────────────────────────────────
-  🤖 AI   Now update the landing page footer too.
-  🔧 TOOL [Edit] pages/index.tsx (replacing 488 chars)
-  📤 OUT  File updated successfully.
-  🤖 AI   Add /mobile to the Layout bypass list.
-  🔧 TOOL [Edit] components/Layout.tsx (replacing 99 chars)
-  🔧 TOOL [Bash] npx next build
-  📤 OUT  ✓ Build passed — 12 pages compiled
+```bash
+relay watch
 ```
 
-## 8 Supported Agents
+Zero intervention. Relay monitors your session, detects rate limits, and hands off automatically.
 
-| Agent | Type | How it launches |
-|-------|------|-----------------|
-| **Codex** | CLI (OpenAI) | Opens interactive TUI with context |
-| **Claude** | CLI (Anthropic) | New Claude session with context |
-| **Aider** | CLI (open source) | Opens with --message handoff |
-| **Gemini** | API / CLI | Gemini CLI or REST API |
-| **Copilot** | CLI (GitHub) | Opens with context |
-| **OpenCode** | CLI (Go) | Opens with context |
-| **Ollama** | Local API | REST call to local model |
-| **OpenAI** | API | GPT-4o / GPT-5.4 API call |
+## Features
+
+### Core
+- **Full conversation capture** — Reads Claude's `.jsonl` transcript, not just git state
+- **8 built-in agents** — Codex, Claude, Aider, Gemini, Copilot, OpenCode, Ollama, OpenAI
+- **Plugin system** — Add custom agents via TOML + shell script (no Rust needed)
+- **Handoff chains** — If first agent fails, auto-cascades to the next in priority
+
+### Intelligence
+- **Context scoring engine** — Relevance-based scoring: recency, error proximity, decision importance
+- **Smart compression** — Priority-based truncation keeps critical info, drops low-value context
+- **Secret detection** — Scans for API keys, tokens, passwords, private keys before sending
+- **Cost estimation** — Shows token count + USD estimate before API handoffs
+
+### Operations
+- **Daemon mode** (`relay watch`) — Background monitoring with auto-handoff
+- **SQLite analytics** — Tracks every handoff: success rate, duration, agent performance
+- **Stats dashboard** (`relay stats`) — TUI dashboard with time-saved estimates
+- **Rate limit auto-detection** — PostToolUse hook for zero-config automation
+
+### Developer Experience
+- **16 CLI commands** — handoff, watch, replay, stats, validate, clean, history, diff, and more
+- **Shell completions** — bash, zsh, fish, powershell
+- **GitHub Action** — `uses: masyv/relay-action@v1` for CI/CD resilience
+- **JSON output** — Every command supports `--json` for scripting
+- **62 tests** — Comprehensive coverage across all modules
 
 ## Quick Start
 
@@ -113,51 +70,176 @@ cd relay && ./scripts/build.sh
 # Symlink to PATH
 ln -sf $(pwd)/core/target/release/relay ~/.cargo/bin/relay
 
-# Generate config
+# Generate config + validate setup
 relay init
-
-# Validate your setup
 relay validate
 
-# Check what agents you have
+# See what agents you have
 relay agents
 
-# See your current session snapshot
-relay status
-
-# Hand off to Codex (interactive — opens TUI)
-relay handoff --to codex
-
-# Interactive agent picker
+# Hand off (interactive agent picker)
 relay handoff
 
-# With deadline urgency
-relay handoff --to codex --deadline "7:00 PM"
+# Hand off to specific agent
+relay handoff --to codex
 
-# Copy to clipboard instead
-relay handoff --clipboard
-
-# Minimal handoff (just task + error + git)
-relay handoff --template minimal --to codex
-
-# When Claude comes back — see what happened
-relay resume
-
-# List all past handoffs
-relay history
-
-# Export history as CSV
-relay history --format csv
-
-# What changed since handoff?
-relay diff
-
-# Clean up old handoff files (keep last 5)
-relay clean
-
-# Clean files older than 7 days
-relay clean --older-than 7d --dry-run
+# Or just run the daemon — zero intervention
+relay watch
 ```
+
+## What Relay Captures
+
+```
+  ════════════════════════════════════════════════════════
+  📋  Session Snapshot
+  ════════════════════════════════════════════════════════
+
+  📁  /Users/dev/myproject
+  🕐  2026-04-10 14:46
+
+  🎯 Current Task
+  ──────────────────────────────────────────────────
+  Fix the mobile/desktop page separation in the footer
+
+  📝 Progress
+  ──────────────────────────────────────────────────
+  ✅  Database schema + REST API
+  🔄  Footer link separation (IN PROGRESS)
+  ⏳  Auth system
+
+  🚨 Last Error
+  ──────────────────────────────────────────────────
+  error[E0499]: cannot borrow as mutable
+
+  💬 Conversation (25 turns)
+  ──────────────────────────────────────────────────
+  🤖 AI   Now update the landing page footer too.
+  🔧 TOOL [Edit] pages/index.tsx (replacing 488 chars)
+  📤 OUT  File updated successfully.
+  🤖 AI   Add /mobile to the Layout bypass list.
+  🔧 TOOL [Bash] npx next build
+  📤 OUT  ✓ Build passed — 12 pages compiled
+```
+
+## All Commands
+
+| Command | Description |
+|---------|-------------|
+| `relay handoff` | Hand off to a fallback agent (with cost estimation + secret scanning) |
+| `relay watch` | Daemon mode — auto-detects rate limits, hands off automatically |
+| `relay replay` | Re-send a saved handoff to any agent for testing |
+| `relay stats` | TUI dashboard — success rates, time saved, agent breakdown |
+| `relay status` | Show current session snapshot |
+| `relay agents` | List configured agents + plugins and availability |
+| `relay resume` | Show what the fallback agent did |
+| `relay history` | List past handoffs (`--format json\|csv\|table`) |
+| `relay diff` | Show changes since last handoff |
+| `relay validate` | Test all agent connectivity and API keys |
+| `relay clean` | Remove old handoff files (`--keep N`, `--older-than 7d`) |
+| `relay completions` | Generate shell completions (bash/zsh/fish/powershell) |
+| `relay plugin-new` | Scaffold a custom agent plugin |
+| `relay init` | Generate default config |
+| `relay hook` | PostToolUse hook for auto-detection |
+
+## 8+ Supported Agents
+
+| Agent | Type | How it launches |
+|-------|------|-----------------|
+| **Codex** | CLI (OpenAI) | Opens interactive TUI with context |
+| **Claude** | CLI (Anthropic) | New Claude session with context |
+| **Aider** | CLI (open source) | Opens with --message handoff |
+| **Gemini** | API / CLI | Gemini CLI or REST API (with retry) |
+| **Copilot** | CLI (GitHub) | Opens with context |
+| **OpenCode** | CLI (Go) | Opens with context |
+| **Ollama** | Local API | REST call to local model (with retry) |
+| **OpenAI** | API | GPT-4o / GPT-5.4 API call (with retry) |
+| **Plugins** | Custom | Your own agents via TOML + shell script |
+
+## Handoff Chains
+
+When you run `relay handoff`, if the first agent fails, Relay automatically tries the next one:
+
+```
+  [1] Trying codex... ❌ Not available
+  [2] Trying gemini... ❌ API error (429)
+  [3] Trying ollama... ✅ Handed off to ollama
+```
+
+This also works in daemon mode (`relay watch`) — complete resilience.
+
+## Plugin System
+
+Create custom agents without writing Rust:
+
+```bash
+relay plugin-new my-agent
+```
+
+This creates `~/.relay/plugins/my-agent/`:
+
+```
+plugin.toml     # Metadata + config
+handoff.sh      # Your agent logic (receives handoff on stdin)
+```
+
+Example `plugin.toml`:
+```toml
+[plugin]
+name = "my-agent"
+description = "Custom internal agent"
+version = "0.1.0"
+command = "./handoff.sh"
+```
+
+Plugins are auto-discovered and appear in `relay agents`.
+
+## Analytics Dashboard
+
+Every handoff is tracked in a local SQLite database:
+
+```bash
+relay stats
+```
+
+```
+  ════════════════════════════════════════════════════════
+  📊  Relay Analytics
+  ════════════════════════════════════════════════════════
+
+  Total handoffs:     47
+  Successful:         43 (91%)
+  Failed:             4
+  Avg duration:       1,250ms
+  Est. time saved:    645 min
+
+  Agent Breakdown
+  ──────────────────────────────────────────────────
+  codex          28 handoffs (27 ok, 1 fail) avg 890ms
+  gemini         12 handoffs (11 ok, 1 fail) avg 2100ms
+  ollama          7 handoffs (5 ok, 2 fail) avg 1800ms
+```
+
+## Secret Detection
+
+Before sending a handoff, Relay scans for:
+- AWS access keys and secret keys
+- OpenAI API keys (`sk-...`)
+- GitHub tokens (`ghp_...`, `gho_...`)
+- Private keys (`-----BEGIN...PRIVATE KEY-----`)
+- Database connection strings (`postgres://`, `mongodb://`)
+- Slack tokens, bearer tokens, generic API keys/passwords
+
+If detected, the handoff is **blocked** with a redacted warning. Use `--force` to override.
+
+## Cost Estimation
+
+For API agents, Relay shows the estimated cost before sending:
+
+```
+  💰 ~2,400 tokens (~$0.006 on gpt-4o)
+```
+
+Free agents (CLI-based like Codex, Aider, Ollama) show `(free — local/CLI agent)`.
 
 ## Context Control
 
@@ -168,54 +250,35 @@ relay handoff --to codex
 # Light: 10 turns only
 relay handoff --to codex --turns 10
 
-# Only git state + todos (no conversation)
+# Only git state + todos
 relay handoff --to codex --include git,todos
 
-# Only conversation
-relay handoff --to codex --include conversation
+# Minimal handoff (just task + error + git)
+relay handoff --template minimal --to codex
 
-# Dry run — see what gets sent without launching
+# Copy to clipboard
+relay handoff --clipboard
+
+# Dry run
 relay handoff --dry-run
-
-# Skip secret detection warning
-relay handoff --to codex --force
 ```
 
-## Shell Completions
+## Daemon Mode
 
 ```bash
-# Bash
-relay completions bash > /etc/bash_completion.d/relay
+# Start watching (polls every 5s, 2min cooldown between handoffs)
+relay watch
 
-# Zsh
-relay completions zsh > ~/.zfunc/_relay
-
-# Fish
-relay completions fish > ~/.config/fish/completions/relay.fish
+# Custom intervals
+relay watch --interval 10 --cooldown 300
 ```
 
-## Secret Detection
-
-Before sending a handoff to any agent, Relay scans for:
-- AWS access keys and secret keys
-- OpenAI API keys (`sk-...`)
-- GitHub tokens (`ghp_...`)
-- Private keys (`-----BEGIN...PRIVATE KEY-----`)
-- Database connection strings
-- Generic API keys, tokens, and passwords
-
-If secrets are detected, the handoff is blocked with a warning. Use `--force` to override.
-
-## How It Works
-
-1. **Reads** `~/.claude/projects/<project>/<session>.jsonl` — Claude's actual transcript
-2. **Extracts** user messages, assistant responses, tool calls, tool results, errors
-3. **Reads** TodoWrite state from the JSONL (your live todo list)
-4. **Captures** git branch, diff summary, uncommitted files, recent commits
-5. **Compresses** with smart priority — critical context always kept, low-value dropped first
-6. **Scans** for secrets and warns before sending sensitive data
-7. **Retries** API calls with exponential backoff on transient failures
-8. **Launches** the agent interactively with inherited stdin/stdout
+The daemon:
+1. Polls Claude's JSONL transcript for new content
+2. Checks last 5 lines for rate limit signals
+3. Auto-captures session state
+4. Chains through agents until one succeeds
+5. Records result in analytics
 
 ## Config
 
@@ -232,16 +295,18 @@ model = "o4-mini"
 
 [agents.gemini]
 api_key = "your-key"
+model = "gemini-2.5-pro"
 
 [agents.openai]
 api_key = "your-key"
+model = "gpt-4o"
 
 [agents.ollama]
 url = "http://localhost:11434"
 model = "llama3"
 ```
 
-## Auto-Handoff (PostToolUse Hook)
+## Auto-Handoff Hook
 
 Add to `~/.claude/settings.json`:
 
@@ -255,30 +320,41 @@ Add to `~/.claude/settings.json`:
 }
 ```
 
-Relay detects rate limit signals in tool output and automatically hands off.
+## GitHub Action
 
-## All Commands
+```yaml
+- uses: masyv/relay-action@v1
+  with:
+    agent: auto
+    gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
+```
 
-| Command | Description |
-|---------|-------------|
-| `relay handoff` | Hand off to a fallback agent |
-| `relay status` | Show current session snapshot |
-| `relay agents` | List configured agents and availability |
-| `relay resume` | Show what happened during handoff |
-| `relay history` | List past handoffs (--format json/csv/table) |
-| `relay diff` | Show changes since last handoff |
-| `relay init` | Generate default config |
-| `relay validate` | Test agent connectivity and API keys |
-| `relay clean` | Remove old handoff files |
-| `relay completions` | Generate shell completions |
-| `relay hook` | PostToolUse hook for auto-detection |
+## Shell Completions
+
+```bash
+relay completions bash > /etc/bash_completion.d/relay
+relay completions zsh > ~/.zfunc/_relay
+relay completions fish > ~/.config/fish/completions/relay.fish
+```
+
+## Architecture
+
+```
+Claude .jsonl → capture → score → compress → scan secrets → estimate cost
+                                                     ↓
+                                              chain handoff (agent1 → agent2 → agent3)
+                                                     ↓
+                                              record analytics → SQLite
+                                                     ↓
+                                              relay stats dashboard
+```
 
 ## Performance
 
 - **5 MB** binary (Rust, stripped, LTO)
 - **< 100ms** session capture
 - **Zero network calls** for capture
-- **48 tests** passing
+- **62 tests** passing
 - **Rust** — no runtime, no GC
 
 ## License
