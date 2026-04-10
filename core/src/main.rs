@@ -117,6 +117,41 @@ enum Commands {
         shell: String,
     },
 
+    /// Watch for rate limits and auto-handoff (daemon mode)
+    Watch {
+        /// Poll interval in seconds (default: 5)
+        #[arg(long, default_value = "5")]
+        interval: u64,
+
+        /// Cooldown between auto-handoffs in seconds (default: 120)
+        #[arg(long, default_value = "120")]
+        cooldown: u64,
+    },
+
+    /// Replay a saved handoff against any agent
+    Replay {
+        /// Handoff file path or index (0 = most recent)
+        #[arg(default_value = "0")]
+        handoff: String,
+
+        /// Target agent
+        #[arg(long)]
+        to: Option<String>,
+
+        /// Just show what would be replayed
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Show handoff analytics and stats dashboard
+    Stats,
+
+    /// Create a new plugin scaffold
+    PluginNew {
+        /// Plugin name
+        name: String,
+    },
+
     /// PostToolUse hook (auto-detect rate limits)
     Hook {
         #[arg(long, default_value = "unknown")]
@@ -256,6 +291,18 @@ fn main() -> Result<()> {
                 }
             }
 
+            // Cost estimation (show for API agents)
+            if !cli.json && !dry_run {
+                let model = match target_name.as_str() {
+                    "gemini" => &config.agents.gemini.model,
+                    "openai" => &config.agents.openai.model,
+                    "ollama" => &config.agents.ollama.model,
+                    _ => "unknown",
+                };
+                let estimate = relay::cost::estimate_cost(&handoff_text, &target_name, model);
+                eprintln!("  \u{1f4b0} {}", relay::cost::format_cost(&estimate));
+            }
+
             // JSON / dry-run output
             if cli.json {
                 println!("{}", serde_json::to_string_pretty(&serde_json::json!({
@@ -363,6 +410,18 @@ fn main() -> Result<()> {
             } else {
                 "Failed".into()
             });
+
+            // Record in analytics
+            if let Ok(db) = relay::analytics::open_db() {
+                let _ = relay::analytics::record_handoff(
+                    &db, &result.agent, result.success, total_ms,
+                    handoff_text.len(), handoff_text.len() / 4,
+                    &template, &project_dir.to_string_lossy(),
+                    &snapshot.current_task,
+                    if result.success { None } else { Some(&result.message) },
+                    0,
+                );
+            }
 
             if result.success {
                 tui::print_handoff_success(&result.agent, &handoff_path.to_string_lossy());
@@ -622,6 +681,112 @@ fn main() -> Result<()> {
 
             let mut cmd = Cli::command();
             generate(shell, &mut cmd, "relay", &mut std::io::stdout());
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // WATCH (daemon mode)
+        // ═══════════════════════════════════════════════════════════════
+        Commands::Watch { interval, cooldown } => {
+            if !cli.json {
+                tui::print_banner();
+            }
+            let watch_config = relay::watch::WatchConfig {
+                poll_interval: std::time::Duration::from_secs(interval),
+                cooldown: std::time::Duration::from_secs(cooldown),
+            };
+            relay::watch::run_watch(&project_dir, &config, &watch_config)?;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // REPLAY
+        // ═══════════════════════════════════════════════════════════════
+        Commands::Replay { handoff, to, dry_run } => {
+            let path = relay::replay::resolve_handoff_path(&project_dir, &handoff)?;
+            eprintln!("  Replaying: {}", path.display());
+
+            let result = relay::replay::replay_handoff(&path, &config, to.as_deref(), dry_run)?;
+
+            if cli.json {
+                println!("{}", serde_json::to_string_pretty(&result)?);
+                return Ok(());
+            }
+
+            if result.success {
+                eprintln!("  \u{2705} Replay to {} succeeded ({} bytes)", result.agent, result.handoff_size);
+            } else {
+                eprintln!("  \u{274c} Replay failed: {}", result.message);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // STATS
+        // ═══════════════════════════════════════════════════════════════
+        Commands::Stats => {
+            let db = relay::analytics::open_db()?;
+            let stats = relay::analytics::get_stats(&db)?;
+
+            if cli.json {
+                println!("{}", serde_json::to_string_pretty(&stats)?);
+                return Ok(());
+            }
+
+            eprintln!();
+            eprintln!("  {}", "═".repeat(50).cyan());
+            eprintln!("  {}  {}", "📊", "Relay Analytics".bold().cyan());
+            eprintln!("  {}", "═".repeat(50).cyan());
+            eprintln!();
+
+            eprintln!("  Total handoffs:     {}", stats.total_handoffs.to_string().bold());
+            eprintln!("  Successful:         {} ({}%)", stats.successful.to_string().green(), format!("{:.0}", stats.success_rate).green());
+            eprintln!("  Failed:             {}", stats.failed.to_string().red());
+            eprintln!("  Avg duration:       {}ms", stats.avg_duration_ms);
+            eprintln!("  Est. time saved:    {} min", format!("{:.0}", stats.total_time_saved_est_min).green().bold());
+
+            if !stats.agents.is_empty() {
+                eprintln!();
+                eprintln!("  {}", "Agent Breakdown".bold());
+                eprintln!("  {}", "─".repeat(50).dimmed());
+                for a in &stats.agents {
+                    eprintln!("  {:<12} {:>3} handoffs ({} ok, {} fail) avg {}ms",
+                        a.agent.bold(), a.total, a.successful.to_string().green(),
+                        a.failed.to_string().red(), a.avg_duration_ms);
+                }
+            }
+
+            if !stats.recent.is_empty() {
+                eprintln!();
+                eprintln!("  {}", "Recent Handoffs".bold());
+                eprintln!("  {}", "─".repeat(50).dimmed());
+                for h in stats.recent.iter().take(5) {
+                    let icon = if h.success { "\u{2705}" } else { "\u{274c}" };
+                    let task = if h.task.len() > 40 {
+                        format!("{}...", &h.task[..37])
+                    } else {
+                        h.task.clone()
+                    };
+                    eprintln!("  {} {} → {:<10} {}", icon, h.timestamp.dimmed(), h.agent, task);
+                }
+            }
+
+            if stats.total_handoffs == 0 {
+                eprintln!();
+                eprintln!("  {}", "No handoffs recorded yet. Run 'relay handoff' to get started.".dimmed());
+            }
+            eprintln!();
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // PLUGIN-NEW
+        // ═══════════════════════════════════════════════════════════════
+        Commands::PluginNew { name } => {
+            let path = relay::plugins::scaffold_plugin(&name)?;
+            eprintln!("  \u{2705} Plugin scaffolded: {}", path.display());
+            eprintln!();
+            eprintln!("  Edit these files:");
+            eprintln!("    {}/plugin.toml    — metadata", path.display());
+            eprintln!("    {}/handoff.sh     — your agent logic", path.display());
+            eprintln!();
+            eprintln!("  The handoff text is piped to stdin of your script.");
         }
 
         // ═══════════════════════════════════════════════════════════════
