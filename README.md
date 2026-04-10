@@ -8,11 +8,11 @@
 [![Tests](https://img.shields.io/badge/tests-62_passing-brightgreen.svg)](https://github.com/Manavarya09/relay/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-<br/>
 
-<video src="https://github.com/Manavarya09/relay/releases/download/v1.2.0/relay-launch-final.mp4" autoplay loop muted playsinline width="100%"></video>
+<p align="center">
+  <img src="assets/promo.gif" alt="Relay launch promo" width="100%"/>
+</p>
 
-<br/>
 
 ---
 
@@ -48,7 +48,9 @@ Zero intervention. Relay monitors your session, detects the rate limit, and hand
 
 ## How It Works
 
-<video src="https://github.com/Manavarya09/relay/releases/download/v1.2.0/relay-workflow-final.mp4" autoplay loop muted playsinline width="100%"></video>
+<p align="center">
+  <img src="assets/demo.gif" alt="Relay workflow demo" width="100%"/>
+</p>
 
 <br/>
 
