@@ -10,7 +10,7 @@
 
 <br/>
 
-https://github.com/Manavarya09/relay/releases/download/v1.2.0/relay-launch-final.mp4
+<video src="https://github.com/Manavarya09/relay/releases/download/v1.2.0/relay-launch-final.mp4" autoplay loop muted playsinline width="100%"></video>
 
 <br/>
 
@@ -48,7 +48,7 @@ Zero intervention. Relay monitors your session, detects the rate limit, and hand
 
 ## How It Works
 
-https://github.com/Manavarya09/relay/releases/download/v1.2.0/relay-workflow-final.mp4
+<video src="https://github.com/Manavarya09/relay/releases/download/v1.2.0/relay-workflow-final.mp4" autoplay loop muted playsinline width="100%"></video>
 
 <br/>
 
