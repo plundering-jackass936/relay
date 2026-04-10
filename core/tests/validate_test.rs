@@ -15,15 +15,22 @@ fn validate_returns_results_for_all_agents() {
 
 #[test]
 fn validate_detects_placeholder_keys() {
+    // Only test openai which has no CLI fallback — purely API key based
     let mut config = Config {
-        general: GeneralConfig::default(),
+        general: GeneralConfig {
+            priority: vec!["openai".into()],
+            ..Default::default()
+        },
         agents: AgentsConfig::default(),
     };
-    config.agents.gemini.api_key = Some("your-key".into());
+    config.agents.openai.api_key = Some("your-key".into());
+    // Clear env var for test isolation
+    std::env::remove_var("OPENAI_API_KEY");
+
     let results = relay::validate::validate_config(&config);
-    let gemini = results.iter().find(|r| r.agent == "gemini").unwrap();
-    assert_eq!(gemini.status, "warn");
-    assert!(gemini.message.contains("placeholder"));
+    let openai = results.iter().find(|r| r.agent == "openai").unwrap();
+    assert_eq!(openai.status, "warn");
+    assert!(openai.message.contains("placeholder"));
 }
 
 #[test]
@@ -35,8 +42,6 @@ fn validate_reports_missing_keys() {
         },
         agents: AgentsConfig::default(),
     };
-    // Clear env var for test isolation
-    let _guard = std::env::var("OPENAI_API_KEY").ok();
     std::env::remove_var("OPENAI_API_KEY");
 
     let results = relay::validate::validate_config(&config);

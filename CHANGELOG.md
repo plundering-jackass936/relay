@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.1.0] - 2026-04-10
+
+### Added
+- `relay validate` — Test all configured agents' connectivity and API key validity
+- `relay clean` — Remove old handoff files with `--keep N`, `--older-than DURATION`, `--dry-run`
+- `relay completions` — Generate shell completions for bash, zsh, fish, powershell
+- **Secret detection** — Scans handoff text for API keys, tokens, passwords, private keys before sending; blocks unless `--force`
+- **Retry with exponential backoff** — API agents (Gemini, OpenAI, Ollama) retry on 429/5xx/network errors (3 retries, 1s/2s/4s)
+- **Smart context compression** — Priority-based truncation: critical info always kept, conversation trimmed from old turns, dropped sections noted
+- **Duration tracking** — Each handoff step shows elapsed time (capture, build, launch) in milliseconds
+- **History export** — `relay history --format json|csv|table`
+- **Build metadata** — `relay --version` shows git hash; `relay -V` shows commit, date, rustc, target
+- **`--force` flag** — Skip secret detection warning on handoff
+- Cross-platform clipboard support (macOS pbcopy, Linux xclip/wl-copy, Windows clip)
+- Cross-platform CI (macOS, Ubuntu, Windows)
+
+### Changed
+- **DRY refactor** — `capture/todos.rs` now reuses `session.rs` path-finding instead of duplicating it
+- Smart handoff compression replaces naive end-truncation
+- Test count: 32 → 48 tests
+
+### Fixed
+- Validate test no longer depends on local CLI availability
+
 ## [1.0.0] - 2026-04-05
 
 ### Added
