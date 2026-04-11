@@ -1,10 +1,13 @@
 {
-  "name": "@masyv/relay",
+  "name": "relay-dev",
   "version": "1.2.0",
-  "description": "Relay — When Claude's rate limit hits, another agent picks up exactly where you left off. Captures session state and hands off to Codex, Gemini, Ollama, or GPT-4.",
+  "description": "When Claude Code hits its rate limit, another agent picks up exactly where you left off.",
+  "bin": {
+    "relay": "./bin/relay"
+  },
   "scripts": {
-    "build": "./scripts/build.sh",
-    "install-bin": "./scripts/install.sh"
+    "postinstall": "node scripts/postinstall.js",
+    "build": "./scripts/build.sh"
   },
   "keywords": [
     "claude-code",
@@ -15,10 +18,13 @@
     "gemini",
     "ollama",
     "openai",
+    "aider",
     "agent",
     "fallback",
     "context",
-    "continuity"
+    "continuity",
+    "rust",
+    "cli"
   ],
   "author": "masyv",
   "license": "MIT",
@@ -26,13 +32,17 @@
     "type": "git",
     "url": "https://github.com/Manavarya09/relay"
   },
-  "homepage": "https://github.com/Manavarya09/relay#readme",
+  "homepage": "https://relay.masyv.dev",
   "files": [
     "README.md",
     "LICENSE",
-    "hooks/",
-    "scripts/",
-    "core/src/",
-    "core/Cargo.toml"
-  ]
+    "bin/",
+    "scripts/postinstall.js",
+    "hooks/"
+  ],
+  "os": ["darwin", "linux", "win32"],
+  "cpu": ["x64", "arm64"],
+  "engines": {
+    "node": ">=16"
+  }
 }

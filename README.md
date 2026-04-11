@@ -112,14 +112,21 @@ The fallback agent gets everything. No re-explaining.
 
 ---
 
+## Install
+
+```bash
+# npm (downloads pre-built binary automatically)
+npm install -g relay-dev
+
+# or from source
+git clone https://github.com/Manavarya09/relay
+cd relay && ./scripts/build.sh
+ln -sf $(pwd)/core/target/release/relay ~/.cargo/bin/relay
+```
+
 ## Quick Start
 
 ```bash
-git clone https://github.com/Manavarya09/relay
-cd relay && ./scripts/build.sh
-
-ln -sf $(pwd)/core/target/release/relay ~/.cargo/bin/relay
-
 relay init
 relay validate
 relay agents

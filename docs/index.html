@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Relay -- Cross-Agent Context Handoff</title>
+  <meta name="description" content="When Claude Code hits its rate limit, Relay hands off your full session to another agent." />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --black: #000;
+      --white: #fff;
+      --cyan: #00d4ff;
+      --yellow: #f0e040;
+      --pink: #ff4088;
+      --off: #f5f5f0;
+      --mono: 'Space Mono', monospace;
+      --sans: 'Space Grotesk', system-ui, sans-serif;
+      --shadow: 6px 6px 0 var(--black);
+      --shadow-lg: 10px 10px 0 var(--black);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--off);
+      color: var(--black);
+      line-height: 1.5;
+    }
+
+    /* NAV */
+    nav {
+      position: fixed;
+      top: 0;
+      width: 100%;
+      z-index: 100;
+      background: var(--cyan);
+      border-bottom: 4px solid var(--black);
+      padding: 14px 0;
+    }
+    nav .inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    nav .logo {
+      font-family: var(--mono);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--black);
+      text-decoration: none;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+    nav .links { display: flex; gap: 20px; align-items: center; }
+    nav .links a {
+      color: var(--black);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    nav .links .btn {
+      background: var(--black);
+      color: var(--cyan);
+      padding: 10px 20px;
+      border: 3px solid var(--black);
+      font-weight: 700;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 4px 4px 0 var(--black);
+      position: relative;
+      top: 0; left: 0;
+    }
+    nav .links .btn:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 6px 6px 0 var(--black);
+    }
+
+    /* HERO */
+    .hero {
+      padding: 160px 24px 80px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .hero .badge {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--black);
+      background: var(--yellow);
+      border: 3px solid var(--black);
+      padding: 6px 18px;
+      box-shadow: var(--shadow);
+      margin-bottom: 28px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    .hero h1 {
+      font-size: clamp(44px, 7vw, 80px);
+      font-weight: 800;
+      line-height: 1.0;
+      letter-spacing: -3px;
+      margin-bottom: 24px;
+      max-width: 800px;
+    }
+    .hero h1 span {
+      background: var(--cyan);
+      padding: 0 8px;
+      border: 3px solid var(--black);
+      box-shadow: var(--shadow);
+      display: inline-block;
+    }
+    .hero p {
+      font-size: 20px;
+      max-width: 580px;
+      margin-bottom: 36px;
+      line-height: 1.5;
+    }
+    .hero .actions { display: flex; gap: 16px; flex-wrap: wrap; }
+    .hero .actions a {
+      padding: 16px 32px;
+      font-weight: 700;
+      font-size: 16px;
+      text-decoration: none;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border: 3px solid var(--black);
+      transition: transform 0.15s, box-shadow 0.15s;
+      position: relative;
+    }
+    .hero .actions .primary {
+      background: var(--black);
+      color: var(--white);
+      box-shadow: var(--shadow-lg);
+    }
+    .hero .actions .primary:hover { transform: translate(-3px, -3px); box-shadow: 13px 13px 0 var(--black); }
+    .hero .actions .secondary {
+      background: var(--white);
+      color: var(--black);
+      box-shadow: var(--shadow);
+    }
+    .hero .actions .secondary:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--black); }
+
+    /* INSTALL */
+    .install-bar {
+      max-width: 1100px;
+      margin: 0 auto 60px;
+      padding: 0 24px;
+    }
+    .install-bar code {
+      display: block;
+      font-family: var(--mono);
+      font-size: 20px;
+      font-weight: 700;
+      padding: 20px 28px;
+      background: var(--black);
+      color: var(--cyan);
+      border: 3px solid var(--black);
+      box-shadow: var(--shadow-lg);
+    }
+
+    /* VIDEO */
+    .video-wrap {
+      max-width: 1100px;
+      margin: 0 auto 80px;
+      padding: 0 24px;
+    }
+    .video-wrap .frame {
+      border: 4px solid var(--black);
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      background: var(--black);
+    }
+    .video-wrap video, .video-wrap img { width: 100%; display: block; }
+
+    /* SECTIONS */
+    section.block {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 80px 24px;
+    }
+    section.block h2 {
+      font-size: 44px;
+      font-weight: 800;
+      letter-spacing: -2px;
+      margin-bottom: 16px;
+    }
+    section.block .sub {
+      font-size: 18px;
+      margin-bottom: 48px;
+      max-width: 500px;
+    }
+
+    /* PROBLEM + SOLUTION CARDS */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 80px;
+    }
+    @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+    .card-brutal {
+      border: 3px solid var(--black);
+      padding: 36px;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+    }
+    .card-brutal h3 {
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .card-brutal p { font-size: 16px; line-height: 1.6; }
+    .card-brutal pre {
+      font-family: var(--mono);
+      font-size: 14px;
+      line-height: 1.7;
+      margin-top: 16px;
+      overflow-x: auto;
+    }
+    .card-brutal.problem { background: var(--pink); color: var(--white); }
+    .card-brutal.problem pre { color: var(--white); }
+    .card-brutal.solution { background: var(--cyan); }
+    .card-brutal.solution pre { color: var(--black); }
+
+    /* FEATURES GRID */
+    .feat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    @media (max-width: 768px) { .feat-grid { grid-template-columns: 1fr; } }
+    .feat-card {
+      background: var(--white);
+      border: 3px solid var(--black);
+      padding: 28px;
+      box-shadow: var(--shadow);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .feat-card:hover {
+      transform: translate(-3px, -3px);
+      box-shadow: 9px 9px 0 var(--black);
+    }
+    .feat-card .tag {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--white);
+      background: var(--black);
+      display: inline-block;
+      padding: 4px 10px;
+      margin-bottom: 14px;
+    }
+    .feat-card h3 { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+    .feat-card p { font-size: 14px; line-height: 1.6; }
+
+    /* STATS BAR */
+    .stats-bar {
+      background: var(--yellow);
+      border-top: 4px solid var(--black);
+      border-bottom: 4px solid var(--black);
+      padding: 40px 24px;
+    }
+    .stats-bar .inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      gap: 32px;
+    }
+    .stats-bar .stat { text-align: center; }
+    .stats-bar .stat .num {
+      font-family: var(--mono);
+      font-size: 48px;
+      font-weight: 700;
+    }
+    .stats-bar .stat .label {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    /* AGENTS */
+    .agents-row {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      padding: 40px 0;
+    }
+    .agents-row .chip {
+      padding: 12px 24px;
+      border: 3px solid var(--black);
+      background: var(--white);
+      font-family: var(--mono);
+      font-size: 16px;
+      font-weight: 700;
+      box-shadow: var(--shadow);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .agents-row .chip:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--black); }
+    .agents-row .chip.accent { background: var(--cyan); }
+
+    /* CTA */
+    .cta-block {
+      text-align: center;
+      padding: 100px 24px;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    .cta-block h2 {
+      font-size: 48px;
+      font-weight: 800;
+      letter-spacing: -2px;
+      margin-bottom: 16px;
+      line-height: 1.05;
+    }
+    .cta-block p { font-size: 18px; margin-bottom: 32px; }
+    .cta-block a {
+      display: inline-block;
+      background: var(--black);
+      color: var(--cyan);
+      padding: 18px 44px;
+      border: 3px solid var(--black);
+      font-weight: 700;
+      font-size: 18px;
+      text-decoration: none;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      box-shadow: var(--shadow-lg);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .cta-block a:hover { transform: translate(-3px, -3px); box-shadow: 13px 13px 0 var(--black); }
+
+    /* FOOTER */
+    footer {
+      border-top: 4px solid var(--black);
+      background: var(--black);
+      color: var(--white);
+      padding: 28px 24px;
+      text-align: center;
+      font-size: 14px;
+      font-family: var(--mono);
+    }
+    footer a { color: var(--cyan); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="inner">
+      <a href="#" class="logo">RELAY</a>
+      <div class="links">
+        <a href="#features">Features</a>
+        <a href="#demo">Demo</a>
+        <a href="https://github.com/Manavarya09/relay" class="btn">GitHub</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="badge">v1.2.0 -- open source -- rust</div>
+    <h1>Rate limit hit? <span>Relay it.</span></h1>
+    <p>Your Claude Code session -- every conversation turn, file edit, error -- handed off to another agent in under 100ms. No re-explaining. No lost context.</p>
+    <div class="actions">
+      <a href="https://github.com/Manavarya09/relay" class="primary">View on GitHub</a>
+      <a href="#demo" class="secondary">Watch demo</a>
+    </div>
+  </section>
+
+  <div class="install-bar">
+    <code>$ npm install -g relay-dev</code>
+  </div>
+
+  <div class="video-wrap">
+    <div class="frame">
+      <video src="https://github.com/Manavarya09/relay/releases/download/v1.2.0/relay-launch-final.mp4" autoplay loop muted playsinline></video>
+    </div>
+  </div>
+
+  <section class="block">
+    <div class="two-col">
+      <div class="card-brutal problem">
+        <h3>The problem</h3>
+        <p>45 minutes deep. Full context. Then it stops.</p>
+        <pre>
+Error: Rate limit reached.
+Your request has been throttled.
+Please wait before making another request.
+
+-- Your context is gone.
+-- Time to re-explain everything.</pre>
+      </div>
+      <div class="card-brutal solution">
+        <h3>The fix</h3>
+        <p>One command. Full context transfer. 52ms.</p>
+        <pre>
+$ relay handoff --to codex
+
+  [1/3] Session captured     42ms
+  [2/3] Handoff built         8ms
+  [3/3] Codex launched
+
+  Handed off to codex
+  Total: 52ms</pre>
+      </div>
+    </div>
+  </section>
+
+  <div class="stats-bar">
+    <div class="inner">
+      <div class="stat"><div class="num">62</div><div class="label">Tests</div></div>
+      <div class="stat"><div class="num">&lt;100ms</div><div class="label">Capture</div></div>
+      <div class="stat"><div class="num">5MB</div><div class="label">Binary</div></div>
+      <div class="stat"><div class="num">16</div><div class="label">Commands</div></div>
+      <div class="stat"><div class="num">8+</div><div class="label">Agents</div></div>
+    </div>
+  </div>
+
+  <section class="block" id="features">
+    <h2>Features</h2>
+    <p class="sub">Everything you need to never lose context again.</p>
+    <div class="feat-grid">
+      <div class="feat-card">
+        <div class="tag">relay watch</div>
+        <h3>Daemon Mode</h3>
+        <p>Background monitoring. Auto-detects rate limits. Hands off without you lifting a finger.</p>
+      </div>
+      <div class="feat-card">
+        <div class="tag">auto-cascade</div>
+        <h3>Handoff Chains</h3>
+        <p>First agent fails? Tries the next one. And the next. Until something works.</p>
+      </div>
+      <div class="feat-card">
+        <div class="tag">relay stats</div>
+        <h3>Analytics</h3>
+        <p>Every handoff tracked. Success rates, agent breakdown, time saved. Local SQLite.</p>
+      </div>
+      <div class="feat-card">
+        <div class="tag">plugins</div>
+        <h3>Custom Agents</h3>
+        <p>TOML file + shell script = your own agent. No Rust. Auto-discovered.</p>
+      </div>
+      <div class="feat-card">
+        <div class="tag">pre-send</div>
+        <h3>Secret Scanning</h3>
+        <p>Catches API keys, tokens, private keys before they get sent anywhere.</p>
+      </div>
+      <div class="feat-card">
+        <div class="tag">scoring</div>
+        <h3>Smart Compression</h3>
+        <p>Relevance scoring. Recent context kept. Old noise dropped. Not dumb truncation.</p>
+      </div>
+      <div class="feat-card">
+        <div class="tag">estimate</div>
+        <h3>Cost Before Send</h3>
+        <p>Shows tokens + USD price before sending to paid APIs. Free agents marked free.</p>
+      </div>
+      <div class="feat-card">
+        <div class="tag">retry</div>
+        <h3>Resilient APIs</h3>
+        <p>Exponential backoff on 429, 500-504, network errors. Three retries default.</p>
+      </div>
+      <div class="feat-card">
+        <div class="tag">relay replay</div>
+        <h3>Test Handoffs</h3>
+        <p>Re-send any saved handoff to any agent. Compare quality. Debug issues.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Works with your stack</h2>
+    <div class="agents-row">
+      <div class="chip">Codex</div>
+      <div class="chip">Claude</div>
+      <div class="chip">Aider</div>
+      <div class="chip">Gemini</div>
+      <div class="chip">Copilot</div>
+      <div class="chip">OpenCode</div>
+      <div class="chip">Ollama</div>
+      <div class="chip">OpenAI</div>
+      <div class="chip accent">+ Plugins</div>
+    </div>
+  </section>
+
+  <div class="video-wrap" id="demo">
+    <div class="frame">
+      <video src="https://github.com/Manavarya09/relay/releases/download/v1.2.0/relay-workflow-final.mp4" autoplay loop muted playsinline></video>
+    </div>
+  </div>
+
+  <section class="cta-block">
+    <h2>Stop re-explaining. Start relaying.</h2>
+    <p>Open source. MIT licensed. Written in Rust. Used daily.</p>
+    <a href="https://github.com/Manavarya09/relay">Star on GitHub</a>
+  </section>
+
+  <footer>
+    Built by <a href="https://github.com/Manavarya09">@masyv</a> // <a href="https://github.com/Manavarya09/relay">GitHub</a> // MIT
+  </footer>
+
+</body>
+</html>
