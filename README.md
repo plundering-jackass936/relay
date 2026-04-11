@@ -3,6 +3,7 @@
 **When Claude Code hits its rate limit, another agent picks up exactly where you left off.**
 
 [![CI](https://github.com/Manavarya09/relay/actions/workflows/ci.yml/badge.svg)](https://github.com/Manavarya09/relay/actions)
+[![npm](https://img.shields.io/npm/v/relay-dev)](https://www.npmjs.com/package/relay-dev)
 [![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)](https://www.rust-lang.org/)
 [![GitHub Release](https://img.shields.io/github/v/release/Manavarya09/relay)](https://github.com/Manavarya09/relay/releases)
 [![Tests](https://img.shields.io/badge/tests-62_passing-brightgreen.svg)](https://github.com/Manavarya09/relay/actions)
@@ -13,6 +14,30 @@
   <img src="assets/promo.gif" alt="Relay launch promo" width="100%"/>
 </p>
 
+---
+
+## Install
+
+```bash
+# npm (auto-downloads pre-built binary)
+npm install -g relay-dev
+
+# or run directly without installing
+npx relay-dev handoff --to codex
+
+# or build from source
+git clone https://github.com/Manavarya09/relay
+cd relay && ./scripts/build.sh
+ln -sf $(pwd)/core/target/release/relay ~/.cargo/bin/relay
+```
+
+After install, set up your config:
+
+```bash
+relay init          # generate ~/.relay/config.toml
+relay validate      # test agent connectivity
+relay agents        # see what's available
+```
 
 ---
 
@@ -112,25 +137,7 @@ The fallback agent gets everything. No re-explaining.
 
 ---
 
-## Install
-
-```bash
-# npm (downloads pre-built binary automatically)
-npm install -g relay-dev
-
-# or from source
-git clone https://github.com/Manavarya09/relay
-cd relay && ./scripts/build.sh
-ln -sf $(pwd)/core/target/release/relay ~/.cargo/bin/relay
-```
-
 ## Quick Start
-
-```bash
-relay init
-relay validate
-relay agents
-```
 
 ```bash
 # Interactive agent picker
