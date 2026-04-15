@@ -26,7 +26,7 @@ pub fn replay_handoff(
     }
 
     let result = if let Some(name) = agent_name {
-        crate::agents::handoff_to_named(config, name, &handoff_text, &project_dir)?
+        crate::agents::handoff_to_named(config, name, &handoff_text, &project_dir, true)?
     } else {
         crate::agents::handoff_to_first_available(config, &handoff_text, &project_dir)?
     };

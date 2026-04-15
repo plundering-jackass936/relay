@@ -56,7 +56,7 @@ fn handoff_to_unavailable_fails_gracefully() {
         },
         agents: Default::default(),
     };
-    let result = agents::handoff_to_named(&config, "openai", "test", "/tmp").unwrap();
+    let result = agents::handoff_to_named(&config, "openai", "test", "/tmp", false).unwrap();
     assert!(!result.success);
     assert!(result.message.contains("not available"));
 }
@@ -67,7 +67,7 @@ fn handoff_to_unknown_agent_fails() {
         general: Default::default(),
         agents: Default::default(),
     };
-    let result = agents::handoff_to_named(&config, "doesnotexist", "test", "/tmp").unwrap();
+    let result = agents::handoff_to_named(&config, "doesnotexist", "test", "/tmp", false).unwrap();
     assert!(!result.success);
     assert!(result.message.contains("Unknown agent"));
 }

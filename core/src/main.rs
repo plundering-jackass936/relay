@@ -69,6 +69,10 @@ enum Commands {
         /// Target a specific session by ID (or prefix). Use 'relay sessions' to list.
         #[arg(long)]
         session: Option<String>,
+
+        /// Disable chain fallback when using --to (don't try other agents on failure)
+        #[arg(long)]
+        no_chain: bool,
     },
 
     /// List available Claude Code sessions
@@ -212,7 +216,7 @@ fn main() -> Result<()> {
         // ═══════════════════════════════════════════════════════════════
         // HANDOFF
         // ═══════════════════════════════════════════════════════════════
-        Commands::Handoff { to, deadline, dry_run, force, turns, include, clipboard, template, session } => {
+        Commands::Handoff { to, deadline, dry_run, force, turns, include, clipboard, template, session, no_chain } => {
             if !cli.json {
                 tui::print_banner();
             }
@@ -432,7 +436,7 @@ fn main() -> Result<()> {
             let sp = tui::step(3, 3, &format!("Launching {}...", target_name));
 
             let result = if to.is_some() {
-                agents::handoff_to_named(&config, &target_name, &handoff_text, &project_dir.to_string_lossy())
+                agents::handoff_to_named(&config, &target_name, &handoff_text, &project_dir.to_string_lossy(), !no_chain)
             } else {
                 agents::handoff_to_first_available(&config, &handoff_text, &project_dir.to_string_lossy())
             }?;
