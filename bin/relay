@@ -1,0 +1,43 @@
+#!/usr/bin/env node
+
+const { execFileSync } = require("child_process");
+const path = require("path");
+const fs = require("fs");
+
+const ext = process.platform === "win32" ? ".exe" : "";
+const binaryName = `relay${ext}`;
+
+const searchPaths = [
+  path.join(__dirname, binaryName),
+  path.join(__dirname, "..", "core", "target", "release", binaryName),
+];
+
+let binaryPath = null;
+
+for (const p of searchPaths) {
+  if (fs.existsSync(p)) {
+    binaryPath = p;
+    break;
+  }
+}
+
+// Check PATH via execFile (no shell injection risk)
+if (!binaryPath) {
+  try {
+    const cmd = process.platform === "win32" ? "where" : "which";
+    const result = execFileSync(cmd, ["relay"], { encoding: "utf8" });
+    const found = result.trim().split("\n")[0];
+    if (found && fs.existsSync(found)) binaryPath = found;
+  } catch {}
+}
+
+if (!binaryPath) {
+  console.error("relay binary not found. Run: npm run postinstall");
+  process.exit(1);
+}
+
+try {
+  execFileSync(binaryPath, process.argv.slice(2), { stdio: "inherit" });
+} catch (e) {
+  process.exit(e.status || 1);
+}

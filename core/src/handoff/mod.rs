@@ -4,6 +4,7 @@
 pub mod templates;
 
 use crate::SessionSnapshot;
+use crate::scoring;
 use anyhow::Result;
 
 /// Build a handoff prompt from a session snapshot.
@@ -142,21 +143,87 @@ pub fn build_handoff(
     );
     sections.push(instructions);
 
-    let mut full = sections.join("\n\n");
+    let full = sections.join("\n\n");
 
-    // Hard cap at max_tokens (rough estimate: chars / 3.5)
+    // Smart compression using the scoring engine
     let max_chars = (max_tokens as f64 * 3.5) as usize;
-    if full.len() > max_chars {
-        // Find a valid UTF-8 char boundary
-        let mut end = max_chars;
-        while end > 0 && !full.is_char_boundary(end) {
-            end -= 1;
-        }
-        full.truncate(end);
-        full.push_str("\n\n[...truncated to fit context limit]");
+    if full.len() <= max_chars {
+        return Ok(full);
     }
 
-    Ok(full)
+    // Use scoring engine to decide what to keep vs drop
+    let scored = scoring::score_snapshot(snapshot);
+    let (keep, dropped) = scoring::budget_allocation(&scored, max_chars);
+
+    tracing::debug!("Scoring engine: keeping {:?}, dropping {:?}", keep, dropped);
+
+    let section_map: Vec<(&str, &str)> = vec![
+        ("current_task", "## CURRENT TASK"),
+        ("last_error", "## LAST ERROR"),
+        ("git_state", "## GIT STATE"),
+        ("decisions", "## KEY DECISIONS"),
+        ("conversation_recent", "## CONVERSATION CONTEXT"),
+        ("conversation_old", "## CONVERSATION CONTEXT"),
+        ("todos", "## PROGRESS"),
+        ("recent_files", "## RECENTLY CHANGED"),
+        ("last_output", "## LAST OUTPUT"),
+    ];
+
+    let mut compressed = Vec::new();
+    compressed.push(sections[0].clone()); // header always first
+
+    for section in &sections[1..] {
+        let should_include = section_map.iter().any(|(score_name, prefix)| {
+            section.starts_with(prefix) && keep.contains(&score_name.to_string())
+        }) || section.starts_with("## INSTRUCTIONS");
+
+        if should_include {
+            compressed.push(section.clone());
+        }
+    }
+
+    // Trim conversation from beginning if still over budget
+    let convo_idx = compressed.iter().position(|s| s.starts_with("## CONVERSATION CONTEXT"));
+    if let Some(idx) = convo_idx {
+        let current_total: usize = compressed.iter().map(|s| s.len() + 2).sum();
+        if current_total > max_chars {
+            let overshoot = current_total - max_chars;
+            let convo = &compressed[idx];
+            if convo.len() > overshoot + 200 {
+                let header = "## CONVERSATION CONTEXT\n\n[Earlier turns omitted to fit context budget]\n\n";
+                let trim_from = overshoot + header.len();
+                let mut safe_start = trim_from.min(convo.len());
+                while safe_start < convo.len() && !convo.is_char_boundary(safe_start) {
+                    safe_start += 1;
+                }
+                if let Some(nl) = convo[safe_start..].find('\n') {
+                    safe_start += nl + 1;
+                }
+                compressed[idx] = format!("{}{}", header, &convo[safe_start..]);
+            }
+        }
+    }
+
+    if !dropped.is_empty() {
+        compressed.push(format!(
+            "[Context compressed to fit {} token budget. Dropped by scoring engine: {}]",
+            max_tokens,
+            dropped.join(", ")
+        ));
+    }
+
+    let mut result = compressed.join("\n\n");
+
+    if result.len() > max_chars {
+        let mut end = max_chars;
+        while end > 0 && !result.is_char_boundary(end) {
+            end -= 1;
+        }
+        result.truncate(end);
+        result.push_str("\n\n[...truncated to fit context limit]");
+    }
+
+    Ok(result)
 }
 
 /// Save handoff to a file for reference/debugging.

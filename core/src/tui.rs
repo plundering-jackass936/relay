@@ -297,6 +297,69 @@ pub fn print_agents(
     eprintln!();
 }
 
+// ─── Sessions Display ──────────────────────────────────────────────────────
+
+pub fn print_sessions(sessions: &[crate::sessions::SessionEntry]) {
+    eprintln!();
+    let term_width = Term::stdout().size().1 as usize;
+    let width = term_width.min(72).max(40);
+    eprintln!("  {}", "═".repeat(width).cyan());
+    eprintln!("  {}  {}", "📂", "Claude Code Sessions".bold().cyan());
+    eprintln!("  {}", "═".repeat(width).cyan());
+    eprintln!();
+
+    if sessions.is_empty() {
+        eprintln!("  {}", "No sessions found.".dimmed());
+        eprintln!();
+        return;
+    }
+
+    for (i, s) in sessions.iter().enumerate() {
+        let id_short = if s.session_id.len() >= 8 {
+            &s.session_id[..8]
+        } else {
+            &s.session_id
+        };
+
+        let branch_str = s.branch.as_deref().unwrap_or("-");
+
+        eprintln!(
+            "  {}  {}  {}  {} turns",
+            id_short.cyan().bold(),
+            s.last_activity.dimmed(),
+            branch_str.green(),
+            s.turns,
+        );
+        eprintln!(
+            "     {}",
+            s.project_path.dimmed(),
+        );
+
+        let task = if s.task_summary.len() > 60 {
+            let mut end = 57;
+            while end > 0 && !s.task_summary.is_char_boundary(end) { end -= 1; }
+            format!("{}...", &s.task_summary[..end])
+        } else {
+            s.task_summary.clone()
+        };
+        eprintln!("     {}", task);
+
+        if i < sessions.len() - 1 {
+            eprintln!("  {}", "─".repeat(width.min(60)).dimmed());
+        }
+    }
+
+    eprintln!();
+    eprintln!(
+        "  {} {} session{}",
+        "📊".to_string(),
+        sessions.len().to_string().bold(),
+        if sessions.len() == 1 { "" } else { "s" },
+    );
+    eprintln!("  {}", "Use: relay handoff --session <id> to target a specific session".dimmed());
+    eprintln!();
+}
+
 // ─── Handoff Result ─────────────────────────────────────────────────────────
 
 pub fn print_handoff_success(agent: &str, file: &str) {

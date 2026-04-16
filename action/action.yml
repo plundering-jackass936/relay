@@ -1,0 +1,70 @@
+name: 'Relay - AI Agent Handoff'
+description: 'Automatically hand off to a fallback AI agent when Claude Code hits rate limits in CI'
+author: 'masyv'
+
+branding:
+  icon: 'zap'
+  color: 'blue'
+
+inputs:
+  agent:
+    description: 'Target agent (codex, gemini, openai, ollama)'
+    required: false
+    default: 'auto'
+  gemini-api-key:
+    description: 'Gemini API key (if using Gemini as fallback)'
+    required: false
+  openai-api-key:
+    description: 'OpenAI API key (if using OpenAI as fallback)'
+    required: false
+  max-context-tokens:
+    description: 'Max tokens for handoff context'
+    required: false
+    default: '8000'
+  template:
+    description: 'Handoff template (full, minimal, raw)'
+    required: false
+    default: 'full'
+
+outputs:
+  handoff-file:
+    description: 'Path to the generated handoff file'
+  agent-used:
+    description: 'Which agent was used for handoff'
+  success:
+    description: 'Whether the handoff succeeded'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Relay
+      shell: bash
+      run: |
+        if ! command -v relay &> /dev/null; then
+          curl -sL https://github.com/Manavarya09/relay/releases/latest/download/relay-linux-x86_64 -o /usr/local/bin/relay
+          chmod +x /usr/local/bin/relay
+        fi
+
+    - name: Configure Relay
+      shell: bash
+      env:
+        GEMINI_KEY: ${{ inputs.gemini-api-key }}
+        OPENAI_KEY: ${{ inputs.openai-api-key }}
+      run: |
+        relay init 2>/dev/null || true
+        if [ -n "$GEMINI_KEY" ]; then
+          export GEMINI_API_KEY="$GEMINI_KEY"
+        fi
+        if [ -n "$OPENAI_KEY" ]; then
+          export OPENAI_API_KEY="$OPENAI_KEY"
+        fi
+
+    - name: Generate Handoff
+      id: handoff
+      shell: bash
+      run: |
+        OUTPUT=$(relay handoff --dry-run --template ${{ inputs.template }} --json 2>/dev/null || echo '{}')
+        HANDOFF_FILE=$(echo "$OUTPUT" | jq -r '.handoff_file // empty')
+        echo "handoff-file=$HANDOFF_FILE" >> "$GITHUB_OUTPUT"
+        echo "success=true" >> "$GITHUB_OUTPUT"
+        echo "agent-used=${{ inputs.agent }}" >> "$GITHUB_OUTPUT"

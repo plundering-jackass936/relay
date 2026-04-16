@@ -1,6 +1,6 @@
 [package]
 name = "relay"
-version = "1.0.0"
+version = "1.2.0"
 edition = "2021"
 description = "Relay — When Claude's rate limit hits, another agent picks up exactly where you left off."
 license = "MIT"
@@ -16,6 +16,7 @@ path = "src/lib.rs"
 [dependencies]
 # CLI
 clap = { version = "4", features = ["derive"] }
+clap_complete = "4"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
@@ -42,11 +43,20 @@ blake3 = "1"
 # HTTP client (for Ollama, OpenAI, Gemini APIs)
 ureq = { version = "2", features = ["json"] }
 
+# Database
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+# Signal handling
+ctrlc = "3"
+
 # Terminal UI
 colored = "2"
 indicatif = "0.17"
 dialoguer = { version = "0.11", features = ["fuzzy-select"] }
 console = "0.15"
+
+[build-dependencies]
+chrono = "0.4"
 
 [profile.release]
 opt-level = 3
